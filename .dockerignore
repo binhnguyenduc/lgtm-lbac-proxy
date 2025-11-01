@@ -1,0 +1,96 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Documentation
+*.md
+!README.md
+!CLAUDE.md
+docs/
+claudedocs/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+multena-proxy
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+
+# Dependency directories
+vendor/
+
+# Configuration files (should be mounted at runtime)
+configs/
+*.yaml
+*.yml
+!go.mod
+!go.sum
+
+# Test files (not needed in production)
+*_test.go
+testdata/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# AI-related
+.claude/
+*.token.txt
+*_token.txt
+access_token*.txt
+id_token*.txt
+TOKEN_*.md
+extract_from_json.py
+*_diagnostic_test.go
+manual_verify_test.go
+
+# OpenSpec (not needed in container)
+openspec/
+AGENTS.md
+
+# Helm charts and Kubernetes manifests
+charts/
+deployments/
+k8s/
+helm/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+azure-pipelines.yml
+
+# Old build directory if it exists
+build/
+
+# Environment files
+.env
+.env.local
+.env.*
+
+# Coverage and profiling
+*.cover
+*.prof
+*.pprof
+
+# License and legal (already in image metadata)
+LICENSE
+COPYING

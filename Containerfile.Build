@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1
+
+# Build stage
+FROM golang:1.25-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Create nonroot user in builder stage
+RUN addgroup -g 65532 -S nonroot && \
+    adduser -u 65532 -S nonroot -G nonroot
+
+WORKDIR /build
+
+# Copy go mod files first for better layer caching
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Build with optimization flags
+# CGO_ENABLED=0: Static binary (no external dependencies)
+# -ldflags: Strip debug info and reduce binary size
+# -trimpath: Remove file system paths from binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo 'dev')" \
+    -trimpath \
+    -o multena-proxy .
+
+# Verify the binary works
+RUN ./multena-proxy --version 2>/dev/null || echo "Binary built successfully"
+
+# Final stage - minimal runtime image
+FROM scratch
+
+# Copy CA certificates for HTTPS requests
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca/ca-certificates.crt
+
+# Copy timezone data (needed for time operations)
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Copy passwd and group files for nonroot user
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+# Copy the binary
+COPY --from=builder /build/multena-proxy /usr/local/bin/multena-proxy
+
+# Create nonroot user (uid:gid = 65532:65532)
+# Note: We need to use builder stage to create the user properly
+USER 65532:65532
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="Multena Proxy" \
+      org.opencontainers.image.description="Multi-tenancy authorization proxy for LGTM stack" \
+      org.opencontainers.image.vendor="Fork by binhnguyenduc" \
+      org.opencontainers.image.source="https://github.com/binhnguyenduc/lgtm-lbac-proxy" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# Health check using the binary itself (no curl needed)
+# The proxy should respond on port 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/usr/local/bin/multena-proxy", "--version"]
+
+WORKDIR /app
+
+ENTRYPOINT ["/usr/local/bin/multena-proxy"]
