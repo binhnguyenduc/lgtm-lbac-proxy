@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 func ContainsIgnoreCase(s []string, e string) bool {
 	for _, v := range s {
@@ -16,5 +19,14 @@ func MapKeysToArray[K comparable, V any](tenantLabel map[K]V) []K {
 	for key := range tenantLabel {
 		tenantLabelKeys = append(tenantLabelKeys, key)
 	}
+
+	// Sort if keys are strings for deterministic output
+	if len(tenantLabelKeys) > 0 {
+		if keys, ok := any(tenantLabelKeys).([]string); ok {
+			sort.Strings(keys)
+			return any(keys).([]K)
+		}
+	}
+
 	return tenantLabelKeys
 }
