@@ -30,6 +30,7 @@ type WebConfig struct {
 	JwksCertURL         string `mapstructure:"jwks_cert_url"`
 	OAuthGroupName      string `mapstructure:"oauth_group_name"`
 	ServiceAccountToken string `mapstructure:"service_account_token"`
+	AuthHeader          string `mapstructure:"auth_header"`
 }
 
 type AdminConfig struct {
@@ -107,12 +108,20 @@ func (a *App) WithConfig() *App {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 	}
+	// Set default auth header if not configured
+	if a.Cfg.Web.AuthHeader == "" {
+		a.Cfg.Web.AuthHeader = "Authorization"
+	}
 	v.OnConfigChange(func(e fsnotify.Event) {
 		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err := v.Unmarshal(a.Cfg)
 		if err != nil {
 			log.Error().Err(err).Msg("Error while unmarshalling config file")
 			a.healthy = false
+		}
+		// Set default auth header if not configured
+		if a.Cfg.Web.AuthHeader == "" {
+			a.Cfg.Web.AuthHeader = "Authorization"
 		}
 		zerolog.SetGlobalLevel(zerolog.Level(a.Cfg.Log.Level))
 	})

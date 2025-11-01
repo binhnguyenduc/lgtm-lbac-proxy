@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -22,21 +21,21 @@ type OAuthToken struct {
 }
 
 // getToken retrieves the OAuth token from the incoming HTTP request.
-// It extracts, parses, and validates the token from the Authorization header.
+// It extracts, parses, and validates the token from the configured authentication header.
 func getToken(r *http.Request, a *App) (OAuthToken, error) {
-	authToken := r.Header.Get("Authorization")
+	authToken := r.Header.Get(a.Cfg.Web.AuthHeader)
 	if authToken == "" {
 		if a.Cfg.Alert.Enabled && r.Header.Get(a.Cfg.Alert.TokenHeader) != "" {
 			authToken = r.Header.Get(a.Cfg.Alert.TokenHeader)
 		} else {
-			return OAuthToken{}, errors.New("no Authorization header found")
+			return OAuthToken{}, fmt.Errorf("no %s header found", a.Cfg.Web.AuthHeader)
 		}
 	}
 	log.Trace().Str("authToken", authToken).Msg("AuthToken")
 	splitToken := strings.Split(authToken, "Bearer")
 	log.Trace().Strs("splitToken", splitToken).Msg("SplitToken")
 	if len(splitToken) != 2 {
-		return OAuthToken{}, errors.New("invalid Authorization header")
+		return OAuthToken{}, fmt.Errorf("invalid %s header", a.Cfg.Web.AuthHeader)
 	}
 
 	oauthToken, token, err := parseJwtToken(strings.TrimSpace(splitToken[1]), a)

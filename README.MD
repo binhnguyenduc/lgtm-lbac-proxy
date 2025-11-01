@@ -1,5 +1,20 @@
 # Multena Proxy
 
+> **📌 FORK NOTICE**
+>
+> This repository is a fork of the [original multena-proxy](https://github.com/gepaplexx/multena-proxy) by Gepardec.
+>
+> **Purpose of this fork:**
+> - Implement additional features that are important to my specific use cases
+> - Keep up-to-date with the latest LGTM stack API changes
+> - Experiment with enhancements and customizations
+>
+> This fork will be maintained as a **separate repository** with its own feature set. If you're interested in any features implemented here and would like them merged into the upstream repository, please let me know and I can coordinate with the original maintainers.
+>
+> For the official release and production-ready version, please visit: [gepaplexx/multena-proxy](https://github.com/gepaplexx/multena-proxy)
+
+---
+
 Making the LGTM-Stack **mul**ti **tena**ncy ready
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/gepaplexx/multena-proxy)](https://goreportcard.com/report/github.com/gepaplexx/multena-proxy)
@@ -173,6 +188,7 @@ web:
   label_store_kind: "configmap" # kind of label store, currently only configmap and mysql are supported
   jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs # url to the jwks certificate
   oauth_group_name: "groups" # name of the group field in the jwt token
+  auth_header: "Authorization" # HTTP header name for JWT authentication (default: "Authorization")
 ```
 
 #### datasource section (thanos|loki)
@@ -310,7 +326,20 @@ and `db`.
 
 #### a. Proxy Section
 
-Define configurations like proxy port, host, TLS verification, and OAuth group name here.
+Define configurations like proxy port, host, TLS verification, OAuth group name, and authentication header here.
+
+**Custom Authentication Header**: By default, Multena expects JWT tokens in the standard `Authorization` header. However, you can configure a custom header name using the `auth_header` option. This is useful when:
+- Deploying behind proxies that use different header names
+- Integrating with systems that pass tokens in custom headers
+- Working in environments where the `Authorization` header is reserved or modified by intermediaries
+
+Example with custom header:
+```yaml
+web:
+  auth_header: "X-Custom-Auth"  # Use custom header instead of "Authorization"
+```
+
+**Migration Note**: Existing deployments will continue to work without any configuration changes, as `auth_header` defaults to `"Authorization"` when not specified.
 
 #### b. Datasource Section (Thanos/Loki)
 

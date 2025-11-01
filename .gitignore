@@ -19,3 +19,18 @@ multena-proxy.iml
 ./configs/config.yaml
 ./configs
 /configs/
+
+# AI-related folders and files
+.claude/
+claudedocs/
+*.token.txt
+*_token.txt
+access_token*.txt
+id_token*.txt
+token.txt
+
+# Temporary debugging/test files
+*_diagnostic_test.go
+manual_verify_test.go
+extract_from_json.py
+TOKEN_*.md
