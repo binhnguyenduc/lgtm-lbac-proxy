@@ -1,0 +1,6 @@
+# Trivy scan suppressions for false positives
+
+# AVD-KSV-0109: False positive - "bypass" is a boolean configuration flag, not a secret
+# ConfigMap contains admin.bypass boolean for enabling admin group bypass feature
+# This is documented configuration, not sensitive data
+AVD-KSV-0109
