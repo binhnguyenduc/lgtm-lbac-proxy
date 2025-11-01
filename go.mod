@@ -1,6 +1,6 @@
 module github.com/gepaplexx/multena-proxy
 
-go 1.23
+go 1.24
 
 require (
 	github.com/MicahParks/jwkset v0.5.19
