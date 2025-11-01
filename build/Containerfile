@@ -1,8 +1,0 @@
-# Use Alpine for CA certificates
-FROM alpine:latest AS certs
-
-FROM scratch
-COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/ca/ca-certificates.crt
-COPY multena-proxy /usr/local/bin/multena-proxy
-USER nonroot:nonroot
-ENTRYPOINT ["multena-proxy"]

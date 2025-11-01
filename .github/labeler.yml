@@ -1,0 +1,56 @@
+# Auto-labeling configuration for PRs based on file patterns
+
+# Documentation changes
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['*.md', 'docs/**/*', 'CLAUDE.md', 'claudedocs/**/*']
+
+# Configuration changes
+configuration:
+  - changed-files:
+    - any-glob-to-any-file: ['configs/**/*', '*.yaml', '*.yml', '*.toml', '*.json']
+
+# GitHub Actions / CI/CD
+github-actions:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/workflows/**/*', '.github/actions/**/*']
+
+# Container/Docker changes
+docker:
+  - changed-files:
+    - any-glob-to-any-file: ['Containerfile*', 'Dockerfile*', '.dockerignore']
+
+# Go source code
+go:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.go', 'go.mod', 'go.sum']
+
+# Tests
+tests:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*_test.go', 'tests/**/*', 'test/**/*']
+
+# Security-related changes
+security:
+  - changed-files:
+    - any-glob-to-any-file: ['auth.go', 'jwks.go', '**/security/**/*', 'tls.go']
+
+# Authentication/Authorization
+auth:
+  - changed-files:
+    - any-glob-to-any-file: ['auth*.go', 'labelstore.go', 'enforce*.go']
+
+# Dependencies
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: ['go.mod', 'go.sum']
+
+# Build system
+build:
+  - changed-files:
+    - any-glob-to-any-file: ['Makefile', 'build/**/*', 'scripts/**/*']
+
+# Deployment
+deployment:
+  - changed-files:
+    - any-glob-to-any-file: ['deploy/**/*', 'k8s/**/*', 'kubernetes/**/*', 'helm/**/*']
