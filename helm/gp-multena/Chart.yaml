@@ -1,6 +1,0 @@
-apiVersion: v2
-appVersion: 0.7.0
-description: A Helm chart for Multena
-name: gp-multena
-type: application
-version: 1.7.0

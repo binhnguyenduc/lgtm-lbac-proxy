@@ -1,7 +1,7 @@
 .PHONY: help build test clean docker-build docker-build-full docker-push run lint
 
 # Variables
-BINARY_NAME=multena-proxy
+BINARY_NAME=lgtm-lbac-proxy
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_DATE=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -9,13 +9,13 @@ LDFLAGS=-ldflags "-w -s -X main.version=$(VERSION) -X main.buildDate=$(BUILD_DAT
 
 # Container variables
 CONTAINER_RUNTIME?=docker
-IMAGE_NAME?=multena-proxy
+IMAGE_NAME?=lgtm-lbac-proxy
 IMAGE_TAG?=$(VERSION)
 REGISTRY?=ghcr.io/binhnguyenduc
 
 ## help: Display this help message
 help:
-	@echo "Multena Proxy - Build Targets"
+	@echo "LGTM LBAC Proxy - Build Targets"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make <target>"

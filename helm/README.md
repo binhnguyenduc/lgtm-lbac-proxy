@@ -4,28 +4,28 @@ This directory contains the Helm chart for deploying Multena Proxy to Kubernetes
 
 ## Chart Information
 
-- **Chart Name**: gp-multena
+- **Chart Name**: lgtm-lbac-proxy
 - **Chart Version**: 1.7.0
 - **App Version**: 0.7.0
-- **Source**: https://github.com/gepaplexx/gp-helm-charts
+- **Source**: https://github.com/binhnguyenduc/lgtm-lbac-proxy
 
 ## Contents
 
-- `gp-multena-1.7.0.tgz` - Packaged Helm chart
-- `gp-multena/` - Extracted chart source files
+- `lgtm-lbac-proxy-1.7.0.tgz` - Packaged Helm chart
+- `lgtm-lbac-proxy/` - Extracted chart source files
 
 ## Installation
 
 ### Using the packaged chart
 
 ```bash
-helm install multena-proxy ./helm/gp-multena-1.7.0.tgz
+helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy-1.7.0.tgz
 ```
 
 ### Using the source files
 
 ```bash
-helm install multena-proxy ./helm/gp-multena
+helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy
 ```
 
 ## Configuration
@@ -100,11 +100,11 @@ proxy:
 To upgrade an existing deployment:
 
 ```bash
-helm upgrade multena-proxy ./helm/gp-multena
+helm upgrade lgtm-lbac-proxy ./helm/lgtm-lbac-proxy
 ```
 
 ## More Information
 
-- [Main Repository](https://github.com/gepaplexx/multena-proxy)
-- [Helm Charts Repository](https://github.com/gepaplexx/gp-helm-charts)
+- [Main Repository](https://github.com/binhnguyenduc/lgtm-lbac-proxy)
+- [Helm Charts Repository](https://github.com/binhnguyenduc/lgtm-lbac-proxy)
 - [Documentation](../README.md)

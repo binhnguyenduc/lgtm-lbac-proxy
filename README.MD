@@ -1,367 +1,335 @@
-# Multena Proxy
+# LGTM LBAC Proxy
 
-> **📌 FORK NOTICE**
->
-> This repository is a fork of the [original multena-proxy](https://github.com/gepaplexx/multena-proxy) by Gepardec.
->
-> **Purpose of this fork:**
-> - Implement additional features that are important to my specific use cases
-> - Keep up-to-date with the latest LGTM stack API changes
-> - Experiment with enhancements and customizations
->
-> This fork will be maintained as a **separate repository** with its own feature set. If you're interested in any features implemented here and would like them merged into the upstream repository, please let me know and I can coordinate with the original maintainers.
->
-> For the official release and production-ready version, please visit: [gepaplexx/multena-proxy](https://github.com/gepaplexx/multena-proxy)
+**Label-Based Access Control for the LGTM Stack** (Loki, Grafana, Tempo, Mimir/Prometheus)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/binhnguyenduc/lgtm-lbac-proxy)](https://goreportcard.com/report/github.com/binhnguyenduc/lgtm-lbac-proxy)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/binhnguyenduc/lgtm-lbac-proxy/release.yml?label=build)](https://github.com/binhnguyenduc/lgtm-lbac-proxy/actions/workflows/release.yml)
+[![GoDoc](https://godoc.org/github.com/binhnguyenduc/lgtm-lbac-proxy?status.svg)](https://godoc.org/github.com/binhnguyenduc/lgtm-lbac-proxy)
+[![Release](https://img.shields.io/github/v/release/binhnguyenduc/lgtm-lbac-proxy)](https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/latest)
+![License](https://img.shields.io/github/license/binhnguyenduc/lgtm-lbac-proxy)
 
 ---
 
-Making the LGTM-Stack **mul**ti **tena**ncy ready
+## 📢 Notice
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/gepaplexx/multena-proxy)](https://goreportcard.com/report/github.com/gepaplexx/multena-proxy)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/gepaplexx/multena-proxy/release.yml?label=build)](https://github.com/gepaplexx/multena-proxy/actions/workflows/release.yml)
-[![GoDoc](https://godoc.org/github.com/gepaplexx/multena-proxy?status.svg)](https://godoc.org/github.com/gepaplexx/multena-proxy)
-[![Release](https://img.shields.io/github/v/release/gepaplexx/multena-proxy)](https://github.com/gepaplexx/multena-proxy/releases/latest)
-![License](https://img.shields.io/github/license/gepaplexx/multena-proxy)
+### Origin and Credits
+
+This project is **based on** [multena-proxy](https://github.com/gepaplexx/multena-proxy) originally developed by **Gepardec**.
+
+We extend our sincere gratitude to the Gepardec team for creating the foundational multi-tenancy proxy architecture that made this project possible. The original work established excellent patterns for label-based access control in observability stacks.
+
+**Original Repository**: https://github.com/gepaplexx/multena-proxy
+
+### Differences from Original
+
+This repository has evolved as an **independent project** with a specific focus on the LGTM stack:
+
+| Aspect | Original (multena-proxy) | This Project (lgtm-lbac-proxy) |
+|--------|--------------------------|--------------------------------|
+| **Focus** | General multi-tenancy proxy | LGTM stack specialization |
+| **Tempo Support** | ❌ Not implemented | ✅ Full TraceQL enforcement |
+| **Branding** | Generic "multena" naming | LGTM-specific branding |
+| **Repository** | Gepardec organization | Independent maintenance |
+| **Development** | Upstream changes | LGTM-focused enhancements |
+| **Target Users** | OpenShift/Thanos users | LGTM stack users |
+
+**Key Enhancements:**
+- ✅ **Grafana Tempo Support**: Full TraceQL query enforcement with tenant label injection
+- ✅ **Complete LGTM Coverage**: Metrics (Prometheus/Mimir), Logs (Loki), and Traces (Tempo)
+- ✅ **LGTM-Optimized**: Documentation, examples, and configurations tailored for LGTM deployments
+- ✅ **Active Development**: Ongoing enhancements focused on LGTM stack integration
+
+**Compatibility**: The core authorization logic, configuration format, and API remain compatible with the original design.
 
 ---
-**Multena Proxy** is a multi-tenancy ready tool designed to enhance the authorization capabilities of your LGTM (Loki
-Grafana Tempo Mimir(Prometheus Style API / OpenMetrics)) stack. Built with LBAC (Label Based Access Control) at its
-core.
 
-Multena provides secure and granular user authorization based on assigned tenant labels.
-It integrates seamlessly with PrometheusAPI and Loki, and
-should support generic oauth provider for identity management. With features like ConfigMap-based configuration,
-flexible authorization providers, and multiple tenant labels, Multena ensures that the right data is accessible to the
-right users.
+## Overview
+
+**LGTM LBAC Proxy** is a multi-tenancy authorization proxy designed specifically for the LGTM observability stack. Built with Label-Based Access Control (LBAC) at its core, it ensures secure and granular access to your observability data.
+
+The proxy intercepts queries to Prometheus/Thanos, Loki, and Tempo, validates JWT tokens, enforces tenant label restrictions, and forwards authorized queries to upstream servers.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **LGTM Stack Coverage** | Complete support for Metrics (Prometheus/Thanos/Mimir), Logs (Loki), and Traces (Tempo) |
+| **Label-Based Access Control** | Fine-grained access control based on tenant labels (namespace, team, environment, etc.) |
+| **JWT Authentication** | Secure authentication via OAuth/OIDC with JWKS validation |
+| **Flexible Label Stores** | ConfigMap or MySQL-based label storage |
+| **Query Enforcement** | Automatic injection of tenant filters into PromQL, LogQL, and TraceQL queries |
+| **Admin Bypass** | Optional admin group with cluster-wide access |
+| **Multi-Tenant Support** | Single user can access multiple tenant namespaces |
+| **Secure Communication** | mTLS support for upstream connections |
+
+### Currently Supported
+
+- ✅ **Metrics**: Prometheus, Thanos, Mimir (PromQL enforcement)
+- ✅ **Logging**: Loki (LogQL enforcement)
+- ✅ **Traces**: Tempo (TraceQL enforcement) 🆕
+- ⏳ **Profiles**: Planned for future release
 
 ---
-> __NOTE:__ Multena was initially developed to support OpenShift 4's internal Prometheus, which is powered by Thanos.
-> As a result, many references in Multena are made to Thanos, which serves as an API following the Prometheus style.
 
-## How does it work?
+## How It Works
 
 ```mermaid
 graph TD
-    A[Receive Request] -->|Extract Token| B{Get OAuth Token?}
-    B -->|Error| E[Deny Request]
-    D -->|Error| E
-    D -->|Valid & Not Skip| G{Enforce Query?}
-    D -->|Valid & Skip| F[Stream Up to Upstream and End]
-    B -->|Success| D{Validate Labels?}
-    G -->|Error| E
-    G -->|Success| F
-
+    A[Receive Request] -->|Extract JWT Token| B{Validate Token?}
+    B -->|Invalid| E[403 Forbidden]
+    B -->|Valid| D{Validate Labels?}
+    D -->|No Labels| E
+    D -->|Has #cluster-wide| F[Forward to Upstream]
+    D -->|Has Labels| G{Enforce Query?}
+    G -->|Unauthorized Label| E
+    G -->|Success| H[Inject Tenant Filter]
+    H --> F
+    F --> I[Stream Response]
 ```
 
-In summary, here's how Multena works:
+**Authorization Flow:**
 
-1. Multena receives a request.
-2. Multena performs an authorization check in the form of a JWT token validation.
-3. If the user is not authorized, Multena denies the query without further processing.
-4. If the user is authorized, Multena examines which labels corrispond to the user.
-5. If the user has no labels, Multena denies the query without further processing.
-6. if the user has labels and its skip (e.g., cluster wide access), it will forward the request to the upstream server
-   without further processing.
-7. If the user has labels, and it's not a skip, Multena checks if the values in the label match in the query are allowed
-   for the user.
-8. If the values are not allowed, Multena dienies the request without further processing.
-9. If there are no label matches for the tenant label (e.g., namespace), Multena will append the allowed labels to the
-   query.
-10. If the values are allowed, Multena forwards the query to the specific endpoint or service responsible for processing
-    the query.
-11. Multena streams the response from the upstream server to the client.
+1. **Request Reception**: Proxy receives a query request (PromQL, LogQL, or TraceQL)
+2. **JWT Validation**: Extracts and validates JWT token from Authorization header
+3. **Label Retrieval**: Fetches allowed tenant labels for user/groups from label store
+4. **Admin Bypass Check**: Users with `#cluster-wide` label skip enforcement
+5. **Query Parsing**: Parses query using appropriate parser (PromQL/LogQL/TraceQL)
+6. **Label Validation**: Checks if existing tenant labels in query are authorized
+7. **Label Injection**: Injects tenant label filters if missing (e.g., `{namespace="prod"}`)
+8. **Proxy Forward**: Forwards modified query to upstream (Prometheus/Loki/Tempo)
+9. **Response Stream**: Streams response back to client
 
-By performing authorization checks, label matching, appending labels, Multena ensures that
-users can only query data they are authorized to access.
+---
 
-## Multena Features
+## Quick Start
 
-| **Feature**                             | **Description**                                                                                                                                                                                            |
-|-----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Authorization Based on Labels           | Enables access control and permissions based on specified labels, ensuring fine-grained access control tailored to your needs.                                                                             |
-| Configurable via ConfigMap              | Allows easy configuration of the proxy using a ConfigMap, simplifying setup process and management of configuration settings.                                                                              |
-| Flexible Authorization Providers        | Supports both ConfigMap and database label store providers. Choose the provider that best fits your requirements.                                                                                          |
-| Integration with PrometheusAPI and Loki | Seamlessly integrates with PrometheusAPI and Loki for efficient authorization. Manage and control access to these powerful observability tools.                                                            |
-| Authentication via OAuth                | Authenticate users using a OAuth provider with JWKS (JSON Web Key Set) to ensure secure and reliable authorization.                                                                                        |
-| Admin Group Privileges                  | Includes an admin group feature allowing users in the specified admin group to bypass enforcing steps. This is useful for granting administrative privileges to specific users.                            |
-| Multiple Tenant Label values            | Supports multiple tenant label values for managing different sets of label values for different tenants. Customize and control access for various groups and users based on their respective tenant label. |
-| Strict communication                    | Multena can send either a bearer token in requests to communicate with components protected by OAuth2 proxy or use mutualTLS to ensure a strict and secure communication.                                  |
-
-## Currently queryable
-
-- [x] Metrics (Prometheus/Thanos/Mimir)
-- [x] Logging (Loki)
-- [x] Traces (Tempo)
-- [ ] Profiles
-
-## Request flow
-
-### integrated flow
-
-```mermaid
-flowchart LR
-    User -->|Authentication| OauthIDP
-    OauthIDP -->|OauthToken| Grafana
-    Grafana -->|OauthToken| Multena
-    Multena -->|Jwks| OauthIDP
-    Multena --> Thanos
-    Multena --> Loki
-```
-
-Jwks is the JSON Web Key Set, which is used to validate the JWT token. It's like a public key for the JWT token.
-
-## Deploy Multena
-
-The helm chart for Multena is available
-at [gp-helm-charts](https://github.com/gepaplexx/gp-helm-chart-development/tree/develop/infra/gp-multena)
-
-To install run the following commands:
-
-```bash 
-helm repo add gepardec https://gepaplexx.github.io/gp-helm-charts/
-helm install multena gepardec/gp-multena -n <grafana-namespace>
-```
-
-To upgrade, run the following commands:
+### Binary
 
 ```bash
-helm repo update
-helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
+# Download latest release
+wget https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/latest/download/lgtm-lbac-proxy
+
+# Make executable
+chmod +x lgtm-lbac-proxy
+
+# Run with config
+./lgtm-lbac-proxy
 ```
 
-> **_NOTE:_** If your using the grafana operator, the helm chart provides an option to install
-> grafana-operator-datasources
-> which simplifies the deployment of Multena. If you deploy Multena without the grafana-operator-datasources you have to
-> configure the datasource manually.
+### Docker
 
-# Configuring Multena
-
-## Labelstore Providers
-
-> **_NOTE:_** Currently Multena offers two different providers for label lookup, namely ConfigMap and MySQL.
-
-### ConfigMap Provider
-
-With the ConfigMap provider, Multena can retrieve labels by reading a separate ConfigMap that defines a list of
-allowed labels for each user or group. This approach allows for easy configuration and management of label permissions
-by specifying the allowed labels directly in the ConfigMap. An example can be found
-here [labels.yaml](./configs/labels.yaml)
-
-You can define the allowed labels for groups and users manually, but if you deploy multena in a single cluster, we
-recommend
-to use the [multena-rbac-collector](https://github.com/gepaplexx/multena-rbac-collector) to continuesly collect the
-permissions
-for each user and group. This tool will create a labels.yaml file which can be directly used by Multena.
-To enable it set, the following setting
-
-```yaml
-rbac-collector:
-  enabled: true 
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -p 8081:8081 \
+  -v $(pwd)/configs:/etc/config/config:ro \
+  ghcr.io/binhnguyenduc/lgtm-lbac-proxy:latest
 ```
 
-in the helm chart.
+### Helm
 
-### MySQL Provider
+```bash
+helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  --set proxy.thanos.url=https://thanos-query:9091 \
+  --set proxy.loki.url=https://loki-query:3100 \
+  --set proxy.tempo.url=https://tempo-query:3100
+```
 
-The MySQL provider enables label lookup through executing a custom
-query against a MySQL database. This capability allows Multena to dynamically fetch the allowed tenant lalbel (e.g.,
-namespace)
-for a specified email or user or groups. By setting the appropriate query in the configuration, Multena can seamlessly
-retrieve
-the relevant label information from the MySQL database.
+---
 
-This makes only sense if you already have a MySQL database with a systematic way to get the permissions for a user.
+## Configuration
 
-> **_NOTE:_** As every query sends a query to the database, we recommend enabling caching for the database.
+### Basic Configuration
 
-### config.yaml
-
-#### proxy section
+Create `config.yaml`:
 
 ```yaml
 web:
-  proxy_port: 8080 # port on which the proxy will listen
-  metrics_port: 8081 # port on which the metrics will be exposed
-  host: localhost # host on which the proxy will listen
-  tls_verify_skip: true # skip tls verification for the upstream server, very insecure!!!
-  trusted_root_ca_path: "./certs/" # path to the trusted root ca
-  label_store_kind: "configmap" # kind of label store, currently only configmap and mysql are supported
-  jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs # url to the jwks certificate
-  oauth_group_name: "groups" # name of the group field in the jwt token
-  auth_header: "Authorization" # HTTP header name for JWT authentication (default: "Authorization")
-```
+  jwks_cert_url: "https://your-oauth-provider.com/certs"
+  label_store_kind: configmap  # or "mysql"
+  oauth_group_name: "groups"
+  auth_header: "Authorization"  # Configurable auth header name
 
-#### datasource section (thanos|loki|tempo)
-
-```yaml
-thanos|loki|tempo: # configure one or more datasources
-url: https://localhost:9091 # url to the datasource endpoint                          | Required
-tenant_label: namespace # label/attribute to enforce (e.g., namespace for metrics/logs, resource.namespace for traces) | Required
-cert: "./certs/thanos/tls.crt" # path to the mtls certificate                        | Optional
-key: "./certs/thanos/tls.key" # path to the mtls key                                 | Optional
-headers: # headers which will be added to the request                                | Optional
-  X-Scope-OrgID: "application"
-actor_header: "X-Loki-Actor-Path" # header filled with base64 username/email for fair usage tracking | Optional
-
-```
-
-**Tempo-specific notes:**
-- `tenant_label` should be a TraceQL attribute (e.g., `resource.namespace`, `span.tenant.id`, `resource.service.namespace`)
-- Supports TraceQL query enforcement for distributed tracing multi-tenancy
-- Compatible with Grafana Tempo v1.5.0+
-
-#### logging section
-
-```yaml
-log:
-  level: 1 # log level, 0 = debug, 1 = info, 2 = warn, 3 = error, -1 = trace exposes sensitive data!!!
-  log_tokens: false # logs jwt, expose sensitive data!!!
-```
-
-#### admin section
-
-```yaml
 admin:
-  bypass: true # enable bypassing the enforcing steps
-  group: gepardec-run-admins # group which is allowed to bypass the enforcing steps
+  bypass: true
+  group: "cluster-admins"
+
+thanos:
+  url: "https://thanos-querier:9091"
+  tenant_label: "namespace"
+  use_mutual_tls: false
+
+loki:
+  url: "https://loki-query-frontend:3100"
+  tenant_label: "kubernetes_namespace_name"
+  actor_header: "X-Loki-Actor"
+
+tempo:
+  url: "https://tempo-query-frontend:3100"
+  tenant_label: "resource.namespace"
+  actor_header: "X-Tempo-User"
 ```
 
-#### alert section
-Grafana Alerting via Multena
-This section enables Grafana alerting functionality through Multena by addressing the limitations of using an OAuth token-secured datasource. When Grafana sends metrics or log requests as part of its alerting process, these requests originate from Grafana itself rather than a user, meaning they lack a valid OAuth token. 
-To accommodate this, a fallback header can be configured in this section, allowing Multena to authenticate these requests.
+### Label Configuration
 
-While this fallback introduces a minimal security risk, it is specifically designed to be used only when requests lack a OAuth token. By enabling this feature, you allow Grafana to seamlessly integrate with your Multena setup for alerting purposes while maintaining reasonable security practices.
+Create `labels.yaml` (ConfigMap mode):
 
 ```yaml
-alert:
-  enabled: false # enable grafana alerting
-  token_header: "X-Multena-alerting" # header which will be filled with the jwt token, as Grafana will not have a oauth token if a user setsup alerting via Grafana alerting.
-  alert_cert_url: "https://sso.example.com/realms/internal/protocol/openid-connect/certs" # url to the jwks certificate that will be used to validate the jwt token that is only for alerting
-  alert_cert: '{"keys":[{"kid":"","kty":"RSA","alg":"RS256","use":"sig","n":""],"x5t":"","x5t#S256":""}]}' # an extra jwks certificate that will be used to validate the jwt token that is supoosed for alerting but will be also valid for other tokens
+# User-specific labels
+alice@example.com:
+  prod: true
+  staging: true
+
+bob@example.com:
+  dev: true
+
+# Group-based labels
+engineering-team:
+  prod: true
+  staging: true
+  dev: true
+
+# Admin access
+cluster-admins:
+  "#cluster-wide": true
 ```
 
-#### db section
+---
 
-```yaml
-db:
-  enabled: false # enable connection to a database
-  user: multitenant # username for the database
-  password_path: "." # path to the password for the database (kubernetes secret)
-  host: localhost # host of the database
-  port: 3306 # port of the database
-  dbName: example # name of the database
-  query: "SELECT * FROM users WHERE username = ?" # query to retrieve data from the database, must return a list of labels
-  token_key: "email|username|groups" # field in the jwt which will be used to query the database 
+## Query Examples
+
+### Metrics (PromQL)
+
+**Before (Original Query)**:
+```promql
+rate(http_requests_total[5m])
 ```
 
-### labels.yaml
-
-The `labels.yaml` file is used to define the allowed labels for groups and users in Multena. It follows a specific YAML
-format as shown below:
-
-```yaml
-group1:
-  '#cluster-wide': true # this grants the group to skip enforcement
-user1:
-  hogarama: true # single namespace
-user3:
-  grafana: true # multi namespace
-  opernshift-logging: true
-  opernshift-monitoring: true
+**After (Enforced)**:
+```promql
+rate(http_requests_total{namespace="prod"}[5m])
 ```
 
-The format consists of a key for username|groupname, followed by another key value pair where the key
-is the label and value is true.
-This has been done to look up the labels faster.
+### Logs (LogQL)
 
-## How to Configure Multena Proxy
+**Before (Original Query)**:
+```logql
+{app="nginx"} |= "error"
+```
 
-### Step 1: Install/Upgrade Multena Using Helm
+**After (Enforced)**:
+```logql
+{kubernetes_namespace_name="prod",app="nginx"} |= "error"
+```
 
-Multena can be deployed using its Helm chart. Execute the following commands to install or upgrade Multena:
+### Traces (TraceQL) 🆕
 
-To **install**:
+**Before (Original Query)**:
+```traceql
+{ span.http.status_code >= 500 }
+```
+
+**After (Enforced)**:
+```traceql
+{ resource.namespace="prod" && span.http.status_code >= 500 }
+```
+
+---
+
+## Datasource Configuration
+
+### Grafana Configuration
+
+Configure Grafana datasources to point to the proxy:
+
+**Prometheus/Thanos:**
+```
+URL: http://lgtm-lbac-proxy:8080/api/v1
+```
+
+**Loki:**
+```
+URL: http://lgtm-lbac-proxy:8080/loki/api/v1
+```
+
+**Tempo:**
+```
+URL: http://lgtm-lbac-proxy:8080/tempo/api
+```
+
+All requests must include valid JWT token in Authorization header.
+
+---
+
+## Building from Source
 
 ```bash
-helm repo add gepardec https://gepaplexx.github.io/gp-helm-charts/
-helm install multena gepardec/gp-multena -n <grafana-namespace>
+# Clone repository
+git clone https://github.com/binhnguyenduc/lgtm-lbac-proxy.git
+cd lgtm-lbac-proxy
+
+# Build binary
+make build
+
+# Run tests
+make test
+
+# Build Docker image
+make docker-build-full
 ```
 
-To **upgrade**:
+See [BUILD.md](BUILD.md) for detailed build instructions.
 
-```bash
-helm repo update
-helm upgrade multena gepardec/gp-multena -n <grafana-namespace>
-```
+---
 
-> **Note**: When using the Grafana operator, the Helm chart provides an option to install `grafana-operator-datasources`
-> to simplify the deployment of Multena. If you deploy it without the `grafana-operator-datasources`, you'll have to
-> configure the datasource manually.
+## Migration from multena-proxy
 
-### Step 2: Choose a Labelstore Provider
+If you're migrating from the original multena-proxy, see [MIGRATION.md](MIGRATION.md) for a comprehensive guide.
 
-Multena offers two types of providers for label lookup - **ConfigMap** and **MySQL**.
+**Key Changes:**
+- Binary name: `multena-proxy` → `lgtm-lbac-proxy`
+- Docker image: `ghcr.io/gepaplexx/multena-proxy` → `ghcr.io/binhnguyenduc/lgtm-lbac-proxy`
+- Helm chart: `gp-multena` → `lgtm-lbac-proxy`
 
-#### a. ConfigMap Provider
+**No breaking changes** to configuration format or API endpoints.
 
-- Utilizes a separate ConfigMap to define allowed labels for each user/group.
-- Labels can be defined manually, or use [multena-rbac-collector](https://github.com/gepaplexx/multena-rbac-collector)
-  for automatic collection of permissions.
+---
 
-To enable the use of multena-rbac-collector in the Helm chart:
+## Documentation
 
-```yaml
-rbac-collector:
-  enabled: true 
-```
+- [Configuration Guide](configs/config.yaml)
+- [Build Instructions](BUILD.md)
+- [Migration Guide](MIGRATION.md)
+- [Helm Chart README](helm/README.md)
 
-#### b. MySQL Provider
+---
 
-- Performs a custom query against a MySQL database to retrieve allowed tenant labels dynamically for a specified
-  user/group.
-- Suitable if you have a systematic way to retrieve permissions for a user via a MySQL database.
+## Contributing
 
-> **Note**: Enable caching for the database since every query sends a request to it.
+Contributions are welcome! This is an independent project focused on LGTM stack support.
 
-### Step 3: Configure `config.yaml`
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-Multena's `config.yaml` contains crucial configuration sections such as `proxy`, `datasource`, `logging`, `admin`,
-and `db`.
+---
 
-#### a. Proxy Section
+## License
 
-Define configurations like proxy port, host, TLS verification, OAuth group name, and authentication header here.
+This project is licensed under the GNU Affero General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
-**Custom Authentication Header**: By default, Multena expects JWT tokens in the standard `Authorization` header. However, you can configure a custom header name using the `auth_header` option. This is useful when:
-- Deploying behind proxies that use different header names
-- Integrating with systems that pass tokens in custom headers
-- Working in environments where the `Authorization` header is reserved or modified by intermediaries
+---
 
-Example with custom header:
-```yaml
-web:
-  auth_header: "X-Custom-Auth"  # Use custom header instead of "Authorization"
-```
+## Acknowledgments
 
-**Migration Note**: Existing deployments will continue to work without any configuration changes, as `auth_header` defaults to `"Authorization"` when not specified.
+- **Original Project**: [multena-proxy](https://github.com/gepaplexx/multena-proxy) by Gepardec
+- **Contributors**: Thank you to everyone who has contributed to making LGTM stack observability more secure
 
-#### b. Datasource Section (Thanos/Loki/Tempo)
+---
 
-Configure one or more datasources (`thanos`, `loki`, `tempo`) and define configurations like URL, tenant label/attribute, certificate paths, and headers.
+## Support
 
-#### c. Logging Section
-
-Manage log level and token logging here.
-
-#### d. Admin Section
-
-Configure if and which group can bypass enforcing steps.
-
-#### e. DB Section
-
-Enable and configure database connections, define query parameters, and specify which JWT field will be used to query
-the database.
-
-
-
+- **Issues**: [GitHub Issues](https://github.com/binhnguyenduc/lgtm-lbac-proxy/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/binhnguyenduc/lgtm-lbac-proxy/discussions)
+- **Documentation**: [GitHub Wiki](https://github.com/binhnguyenduc/lgtm-lbac-proxy/wiki)

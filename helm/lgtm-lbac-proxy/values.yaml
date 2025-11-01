@@ -46,7 +46,7 @@ GrafanaOperatorDatasources:
 
 replicas: 1
 image:
-  repository: ghcr.io/gepaplexx/multena-proxy
+  repository: ghcr.io/binhnguyenduc/lgtm-lbac-proxy
   pullPolicy: IfNotPresent
   tag: ""
 

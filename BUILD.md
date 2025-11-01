@@ -32,7 +32,7 @@ Packages a pre-built binary.
 
 **Features:**
 - Minimal runtime image based on `scratch`
-- Requires pre-built `multena-proxy` binary
+- Requires pre-built `lgtm-lbac-proxy` binary
 - Same security and health check features
 
 ## 🚀 Quick Start
@@ -41,10 +41,10 @@ Packages a pre-built binary.
 
 ```bash
 # Build using Containerfile.Build
-docker build -f Containerfile.Build -t multena-proxy:latest .
+docker build -f Containerfile.Build -t lgtm-lbac-proxy:latest .
 
 # Or with podman
-podman build -f Containerfile.Build -t multena-proxy:latest .
+podman build -f Containerfile.Build -t lgtm-lbac-proxy:latest .
 ```
 
 ### Build with Pre-compiled Binary
@@ -54,10 +54,10 @@ podman build -f Containerfile.Build -t multena-proxy:latest .
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
   -ldflags="-w -s" \
   -trimpath \
-  -o multena-proxy .
+  -o lgtm-lbac-proxy .
 
 # Step 2: Build container
-docker build -f Containerfile -t multena-proxy:latest .
+docker build -f Containerfile -t lgtm-lbac-proxy:latest .
 ```
 
 ## 🏗️ Production Build Best Practices
@@ -70,7 +70,7 @@ docker buildx create --use
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -f Containerfile.Build \
-  -t multena-proxy:latest \
+  -t lgtm-lbac-proxy:latest \
   --push \
   .
 ```
@@ -81,8 +81,8 @@ docker buildx build \
 # Automatically embed version from git
 docker build \
   -f Containerfile.Build \
-  -t multena-proxy:$(git describe --tags --always) \
-  -t multena-proxy:latest \
+  -t lgtm-lbac-proxy:$(git describe --tags --always) \
+  -t lgtm-lbac-proxy:latest \
   .
 ```
 
@@ -95,7 +95,7 @@ docker build \
   --build-arg VERSION=$(git describe --tags) \
   --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
   --build-arg VCS_REF=$(git rev-parse --short HEAD) \
-  -t multena-proxy:latest \
+  -t lgtm-lbac-proxy:latest \
   .
 ```
 
@@ -104,19 +104,19 @@ docker build \
 ### View Image Layers
 
 ```bash
-docker history multena-proxy:latest
+docker history lgtm-lbac-proxy:latest
 ```
 
 ### Inspect Metadata
 
 ```bash
-docker inspect multena-proxy:latest
+docker inspect lgtm-lbac-proxy:latest
 ```
 
 ### Check Image Size
 
 ```bash
-docker images multena-proxy:latest
+docker images lgtm-lbac-proxy:latest
 ```
 
 Expected size: **~10-15 MB** (Containerfile.Build)
@@ -130,7 +130,7 @@ docker run --rm \
   -p 8080:8080 \
   -p 8081:8081 \
   -v $(pwd)/configs:/etc/config/config:ro \
-  multena-proxy:latest
+  lgtm-lbac-proxy:latest
 ```
 
 ### Health Check
@@ -138,7 +138,7 @@ docker run --rm \
 ```bash
 # Container will automatically health check every 30s
 # Manual check:
-docker exec <container-id> /usr/local/bin/multena-proxy --version
+docker exec <container-id> /usr/local/bin/lgtm-lbac-proxy --version
 ```
 
 ### Run with Custom Config
@@ -148,7 +148,7 @@ docker run --rm \
   -p 8080:8080 \
   -v $(pwd)/configs/config.yaml:/etc/config/config/config.yaml:ro \
   -v $(pwd)/configs/labels.yaml:/etc/config/config/labels.yaml:ro \
-  multena-proxy:latest
+  lgtm-lbac-proxy:latest
 ```
 
 ## 🛡️ Security Features
@@ -163,13 +163,13 @@ docker run --rm \
 
 ```bash
 # Scan with Trivy
-trivy image multena-proxy:latest
+trivy image lgtm-lbac-proxy:latest
 
 # Scan with Grype
-grype multena-proxy:latest
+grype lgtm-lbac-proxy:latest
 
 # Scan with Docker Scout
-docker scout cves multena-proxy:latest
+docker scout cves lgtm-lbac-proxy:latest
 ```
 
 ## 📊 Build Optimization Tips
@@ -201,7 +201,7 @@ Result: **Faster builds** and **smaller build context**
 docker builder prune -a
 
 # Force rebuild without cache
-docker build --no-cache -f Containerfile.Build -t multena-proxy:latest .
+docker build --no-cache -f Containerfile.Build -t lgtm-lbac-proxy:latest .
 ```
 
 ## 🐞 Troubleshooting
@@ -217,7 +217,7 @@ docker build \
   --build-arg HTTP_PROXY=http://proxy:8080 \
   --build-arg HTTPS_PROXY=http://proxy:8080 \
   -f Containerfile.Build \
-  -t multena-proxy:latest \
+  -t lgtm-lbac-proxy:latest \
   .
 ```
 
@@ -227,7 +227,7 @@ docker build \
 
 **Solution**:
 ```bash
-chmod +x multena-proxy
+chmod +x lgtm-lbac-proxy
 ```
 
 ### Health Check Failing
@@ -237,7 +237,7 @@ chmod +x multena-proxy
 **Solution**: Update Containerfile health check to use actual endpoint:
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s \
-  CMD ["/usr/local/bin/multena-proxy", "healthz"]
+  CMD ["/usr/local/bin/lgtm-lbac-proxy", "healthz"]
 ```
 
 ## 📈 Performance Benchmarks

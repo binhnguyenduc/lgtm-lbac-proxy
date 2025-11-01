@@ -1,4 +1,4 @@
-module github.com/gepaplexx/multena-proxy
+module github.com/binhnguyenduc/lgtm-lbac-proxy
 
 go 1.25.1
 

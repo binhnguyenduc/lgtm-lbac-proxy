@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# This Containerfile expects a pre-built multena-proxy binary
-# Build the binary first: CGO_ENABLED=0 go build -ldflags="-w -s" -trimpath -o multena-proxy .
+# This Containerfile expects a pre-built lgtm-lbac-proxy binary
+# Build the binary first: CGO_ENABLED=0 go build -ldflags="-w -s" -trimpath -o lgtm-lbac-proxy .
 
 # Helper stage to create user and get certificates
 FROM alpine:latest AS prep
@@ -28,22 +28,22 @@ COPY --from=prep /etc/passwd /etc/passwd
 COPY --from=prep /etc/group /etc/group
 
 # Copy the pre-built binary
-COPY multena-proxy /usr/local/bin/multena-proxy
+COPY lgtm-lbac-proxy /usr/local/bin/lgtm-lbac-proxy
 
 # Run as non-root user
 USER 65532:65532
 
 # Add metadata labels
-LABEL org.opencontainers.image.title="Multena Proxy" \
-      org.opencontainers.image.description="Multi-tenancy authorization proxy for LGTM stack" \
-      org.opencontainers.image.vendor="Fork by binhnguyenduc" \
+LABEL org.opencontainers.image.title="LGTM LBAC Proxy" \
+      org.opencontainers.image.description="Label-Based Access Control proxy for LGTM stack (Loki, Grafana, Tempo, Mimir)" \
+      org.opencontainers.image.vendor="binhnguyenduc" \
       org.opencontainers.image.source="https://github.com/binhnguyenduc/lgtm-lbac-proxy" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="AGPL-3.0"
 
 # Health check using the binary itself
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD ["/usr/local/bin/multena-proxy", "--version"]
+  CMD ["/usr/local/bin/lgtm-lbac-proxy", "--version"]
 
 WORKDIR /app
 
-ENTRYPOINT ["/usr/local/bin/multena-proxy"]
+ENTRYPOINT ["/usr/local/bin/lgtm-lbac-proxy"]

@@ -107,10 +107,10 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-w -s -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo 'dev') -X main.Commit=$(git rev-parse HEAD)" \
             -trimpath \
-            -o multena-proxy .
+            -o lgtm-lbac-proxy .
 
       - name: Verify binary
-        run: ./multena-proxy --version 2>/dev/null || echo "Binary built successfully"
+        run: ./lgtm-lbac-proxy --version 2>/dev/null || echo "Binary built successfully"
 
   push:
     needs: [ build, test, scan, lint ]
