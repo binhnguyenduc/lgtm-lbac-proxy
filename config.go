@@ -81,6 +81,16 @@ type LokiConfig struct {
 	ActorHeader  string            `mapstructure:"actor_header"`
 }
 
+type TempoConfig struct {
+	URL          string            `mapstructure:"url"`
+	TenantLabel  string            `mapstructure:"tenant_label"`
+	UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
+	Cert         string            `mapstructure:"cert"`
+	Key          string            `mapstructure:"key"`
+	Headers      map[string]string `mapstructure:"headers"`
+	ActorHeader  string            `mapstructure:"actor_header"`
+}
+
 type Config struct {
 	Log    LogConfig    `mapstructure:"log"`
 	Web    WebConfig    `mapstructure:"web"`
@@ -90,6 +100,7 @@ type Config struct {
 	Db     DbConfig     `mapstructure:"db"`
 	Thanos ThanosConfig `mapstructure:"thanos"`
 	Loki   LokiConfig   `mapstructure:"loki"`
+	Tempo  TempoConfig  `mapstructure:"tempo"`
 }
 
 func (a *App) WithConfig() *App {
@@ -112,6 +123,8 @@ func (a *App) WithConfig() *App {
 	if a.Cfg.Web.AuthHeader == "" {
 		a.Cfg.Web.AuthHeader = "Authorization"
 	}
+	// Validate Tempo configuration if provided
+	a.validateTempoConfig()
 	v.OnConfigChange(func(e fsnotify.Event) {
 		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err := v.Unmarshal(a.Cfg)
@@ -123,6 +136,8 @@ func (a *App) WithConfig() *App {
 		if a.Cfg.Web.AuthHeader == "" {
 			a.Cfg.Web.AuthHeader = "Authorization"
 		}
+		// Validate Tempo configuration if provided
+		a.validateTempoConfig()
 		zerolog.SetGlobalLevel(zerolog.Level(a.Cfg.Log.Level))
 	})
 	v.WatchConfig()
@@ -200,6 +215,14 @@ func (a *App) WithTLSConfig() *App {
 		certificates = append(certificates, thanosCert)
 	}
 
+	tempoCert, err := tls.LoadX509KeyPair(a.Cfg.Tempo.Cert, a.Cfg.Tempo.Key)
+	if err != nil {
+		log.Error().Err(err).Msg("Error while loading tempo certificate")
+	} else {
+		log.Debug().Str("path", a.Cfg.Tempo.Cert).Msg("Adding Tempo certificate")
+		certificates = append(certificates, tempoCert)
+	}
+
 	config := &tls.Config{
 		InsecureSkipVerify: a.Cfg.Web.TLSVerifySkip,
 		RootCAs:            rootCAs,
@@ -228,4 +251,54 @@ func (a *App) WithJWKS() *App {
 	log.Info().Str("url", a.Cfg.Web.JwksCertURL).Msg("JWKS URL")
 	a.Jwks = jwks
 	return a
+}
+
+// validateTempoConfig validates Tempo configuration settings
+func (a *App) validateTempoConfig() {
+	// Skip validation if Tempo URL is not configured
+	if a.Cfg.Tempo.URL == "" {
+		return
+	}
+
+	// Validate URL format
+	if !strings.HasPrefix(a.Cfg.Tempo.URL, "http://") && !strings.HasPrefix(a.Cfg.Tempo.URL, "https://") {
+		log.Warn().Str("url", a.Cfg.Tempo.URL).Msg("Tempo URL should start with http:// or https://")
+	}
+
+	// Validate tenant_label format (TraceQL attributes must start with scope prefix)
+	if a.Cfg.Tempo.TenantLabel != "" {
+		validPrefixes := []string{"resource.", "span.", "event.", "link.", "."}
+		hasValidPrefix := false
+		for _, prefix := range validPrefixes {
+			if strings.HasPrefix(a.Cfg.Tempo.TenantLabel, prefix) {
+				hasValidPrefix = true
+				break
+			}
+		}
+		if !hasValidPrefix {
+			log.Warn().
+				Str("tenant_label", a.Cfg.Tempo.TenantLabel).
+				Msg("Tempo tenant_label should start with resource., span., event., link., or . (for intrinsic attributes)")
+		}
+	}
+
+	// Validate certificate files exist if mTLS is enabled
+	if a.Cfg.Tempo.UseMutualTLS {
+		if a.Cfg.Tempo.Cert != "" {
+			if _, err := os.Stat(a.Cfg.Tempo.Cert); os.IsNotExist(err) {
+				log.Error().Str("cert", a.Cfg.Tempo.Cert).Msg("Tempo certificate file not found")
+			}
+		}
+		if a.Cfg.Tempo.Key != "" {
+			if _, err := os.Stat(a.Cfg.Tempo.Key); os.IsNotExist(err) {
+				log.Error().Str("key", a.Cfg.Tempo.Key).Msg("Tempo key file not found")
+			}
+		}
+	}
+
+	log.Debug().
+		Str("url", a.Cfg.Tempo.URL).
+		Str("tenant_label", a.Cfg.Tempo.TenantLabel).
+		Bool("use_mutual_tls", a.Cfg.Tempo.UseMutualTLS).
+		Msg("Tempo configuration validated")
 }

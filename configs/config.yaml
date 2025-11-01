@@ -53,5 +53,14 @@ loki:
   headers:
     "X-Scope-OrgID": "application" # header to use for loki tenant
 
+tempo:
+  url: https://localhost:3200 # url to tempo querier
+  tenant_label: resource.namespace # TraceQL attribute to use for tenant (e.g., resource.namespace, span.tenant.id)
+  cert: "./certs/tempo/tls.crt" # path to tempo mtls cert
+  key: "./certs/tempo/tls.key" # path to tempo mtls key
+  headers:
+    "X-Scope-OrgID": "application" # header to use for tempo tenant
+  actor_header: "X-Tempo-User" # optional header for fair usage tracking (base64 encoded username)
+
 NotRealKey:
   forTesting: purpose

@@ -89,9 +89,9 @@ users can only query data they are authorized to access.
 
 ## Currently queryable
 
-- [x] Metrics
-- [x] Logging
-- [ ] Traces
+- [x] Metrics (Prometheus/Thanos/Mimir)
+- [x] Logging (Loki)
+- [x] Traces (Tempo)
 - [ ] Profiles
 
 ## Request flow
@@ -191,19 +191,24 @@ web:
   auth_header: "Authorization" # HTTP header name for JWT authentication (default: "Authorization")
 ```
 
-#### datasource section (thanos|loki)
+#### datasource section (thanos|loki|tempo)
 
 ```yaml
-thanos|loki: # choose either thanos or loki
-url: https://localhost:9091 # url to the thanos or loki endpoint     | Required
-tenant_label: namespace # label which is used to enforce the query   | Required
-cert: "./certs/thanos/tls.crt" # path to the mtls certificate        | Optional
-key: "./certs/thanos/tls.key" # path to the mtls key                 | Optional
-token: # headers which will be added to the request                 | Optional
+thanos|loki|tempo: # configure one or more datasources
+url: https://localhost:9091 # url to the datasource endpoint                          | Required
+tenant_label: namespace # label/attribute to enforce (e.g., namespace for metrics/logs, resource.namespace for traces) | Required
+cert: "./certs/thanos/tls.crt" # path to the mtls certificate                        | Optional
+key: "./certs/thanos/tls.key" # path to the mtls key                                 | Optional
+headers: # headers which will be added to the request                                | Optional
   X-Scope-OrgID: "application"
-actor_header: "X-Loki-Actor-Path" # header that will be filled with a base64 username/email to enable loki fair usage | Optional 
+actor_header: "X-Loki-Actor-Path" # header filled with base64 username/email for fair usage tracking | Optional
 
 ```
+
+**Tempo-specific notes:**
+- `tenant_label` should be a TraceQL attribute (e.g., `resource.namespace`, `span.tenant.id`, `resource.service.namespace`)
+- Supports TraceQL query enforcement for distributed tracing multi-tenancy
+- Compatible with Grafana Tempo v1.5.0+
 
 #### logging section
 
@@ -341,9 +346,9 @@ web:
 
 **Migration Note**: Existing deployments will continue to work without any configuration changes, as `auth_header` defaults to `"Authorization"` when not specified.
 
-#### b. Datasource Section (Thanos/Loki)
+#### b. Datasource Section (Thanos/Loki/Tempo)
 
-Specify either `thanos` or `loki` and define configurations like URL, tenant label, certificate paths, and headers.
+Configure one or more datasources (`thanos`, `loki`, `tempo`) and define configurations like URL, tenant label/attribute, certificate paths, and headers.
 
 #### c. Logging Section
 

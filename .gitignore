@@ -22,7 +22,10 @@ multena-proxy.iml
 
 # AI-related folders and files
 .claude/
+.serena/
 claudedocs/
+openspec/
+CLAUDE.md
 *.token.txt
 *_token.txt
 access_token*.txt
@@ -34,3 +37,4 @@ token.txt
 manual_verify_test.go
 extract_from_json.py
 TOKEN_*.md
+coverage.out

@@ -48,6 +48,7 @@ func (a *App) WithRoutes() *App {
 	a.e = e
 	a.WithLoki()
 	a.WithThanos()
+	a.WithTempo()
 	return a
 }
 
@@ -100,6 +101,48 @@ func (a *App) WithLoki() *App {
 			a.Cfg.Loki.URL,
 			a.Cfg.Loki.UseMutualTLS,
 			a.Cfg.Loki.Headers,
+			a)).Name(route.Url)
+	}
+	return a
+}
+
+// WithTempo configures and adds a set of Tempo API routes to the App's router,
+// logging warnings if the Tempo URL is not set, and returns the updated App.
+//
+// Routes are based on Tempo HTTP API:
+// https://grafana.com/docs/tempo/latest/api_docs/
+func (a *App) WithTempo() *App {
+	if a.Cfg.Tempo.URL == "" {
+		log.Warn().Msg("Tempo URL not set, skipping Tempo routes")
+		return a
+	}
+	routes := []Route{
+		// Search Endpoints - https://grafana.com/docs/tempo/latest/api_docs/#search
+		{Url: "/api/search", MatchWord: "q"},
+		{Url: "/api/v2/search", MatchWord: "q"},
+		// Tag Discovery - https://grafana.com/docs/tempo/latest/api_docs/#search-tags
+		{Url: "/api/search/tags", MatchWord: "scope"},
+		{Url: "/api/v2/search/tags", MatchWord: "scope"},
+		// Tag Values - https://grafana.com/docs/tempo/latest/api_docs/#search-tag-values
+		{Url: "/api/search/tag/{tag}/values", MatchWord: "q"},
+		{Url: "/api/v2/search/tag/{tag}/values", MatchWord: "q"},
+		// Metrics (Experimental) - https://grafana.com/docs/tempo/latest/api_docs/#metrics
+		{Url: "/api/metrics/query_range", MatchWord: "q"},
+		{Url: "/api/metrics/query", MatchWord: "q"},
+		// Trace Retrieval - https://grafana.com/docs/tempo/latest/api_docs/#query
+		// Note: These endpoints don't use query parameters, so enforcement is skipped
+		{Url: "/api/traces/{traceID}", MatchWord: ""},
+		{Url: "/api/v2/traces/{traceID}", MatchWord: ""},
+	}
+	tempoRouter := a.e.PathPrefix("/tempo").Subrouter()
+	for _, route := range routes {
+		log.Trace().Any("route", route).Msg("Tempo route")
+		tempoRouter.HandleFunc(route.Url, handler(route.MatchWord,
+			TraceQLEnforcer(struct{}{}),
+			a.Cfg.Tempo.TenantLabel,
+			a.Cfg.Tempo.URL,
+			a.Cfg.Tempo.UseMutualTLS,
+			a.Cfg.Tempo.Headers,
 			a)).Name(route.Url)
 	}
 	return a
@@ -215,6 +258,13 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 				return
 			}
 		}
+		if _, ok := enforcer.(TraceQLEnforcer); ok {
+			err := setActorHeaderTraceQL(r, oauthToken, a)
+			if err != nil {
+				logAndWriteError(w, http.StatusForbidden, err, "")
+				return
+			}
+		}
 
 		streamUp(w, r, upstreamURL, tls, headers, a)
 	}
@@ -234,6 +284,15 @@ func setActorHeaderPromQL(r *http.Request, token OAuthToken, a *App) error {
 		data := fmt.Sprintf("%s%s", token.PreferredUsername, token.Email)
 		encoded := base64.StdEncoding.EncodeToString([]byte(data))
 		r.Header.Set(a.Cfg.Thanos.ActorHeader, encoded)
+	}
+	return nil
+}
+
+func setActorHeaderTraceQL(r *http.Request, token OAuthToken, a *App) error {
+	if a.Cfg.Tempo.ActorHeader != "" {
+		data := fmt.Sprintf("%s%s", token.PreferredUsername, token.Email)
+		encoded := base64.StdEncoding.EncodeToString([]byte(data))
+		r.Header.Set(a.Cfg.Tempo.ActorHeader, encoded)
 	}
 	return nil
 }
