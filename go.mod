@@ -1,13 +1,13 @@
 module github.com/gepaplexx/multena-proxy
 
-go 1.25.0
+go 1.23
 
 require (
 	github.com/MicahParks/jwkset v0.5.19
 	github.com/MicahParks/keyfunc/v3 v3.3.5
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gorilla/mux v1.8.1
 	github.com/observatorium/api v0.1.3-0.20240311102334-63c873db5762
 	github.com/prometheus-community/prom-label-proxy v0.11.0
