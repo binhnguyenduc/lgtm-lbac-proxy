@@ -126,16 +126,6 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: '0'
 
-      - name: Get tag version
-        id: tag_version
-        uses: anothrNick/github-tag-action@1.71.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WITH_V: true
-          DRY_RUN: true
-          DEFAULT_BUMP: patch
-          RELEASE_BRANCHES: main
-
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -143,12 +133,15 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ github.repository }}
           tags: |
-            type=schedule
+            # Tag with branch name for branch builds
             type=ref,event=branch
-            type=raw,value=${{ steps.tag_version.outputs.new_tag }}-${{ github.head_ref }}, enable=${{ github.ref != 'refs/heads/main' }}
-            type=raw,value=${{ steps.tag_version.outputs.new_tag }}-${{ github.head_ref }}-${{github.sha}}, enable=${{ github.ref != 'refs/heads/main' }}
-            type=raw,value=${{github.sha}}
-            type=semver,pattern={{version}},value=${{ steps.tag_version.outputs.new_tag }},enable={{is_default_branch}}
+            # Tag with commit SHA for all builds
+            type=sha,prefix=,format=long
+            # Tag with semver for release tags (v1.0.0, v1.0, v1)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # Latest tag only for main branch
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=Multena Proxy
@@ -185,7 +178,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           build-args: |
-            VERSION=${{ steps.tag_version.outputs.new_tag }}
+            VERSION=${{ steps.meta.outputs.version }}
             COMMIT=${{ github.sha }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
 
@@ -226,7 +219,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ steps.tag_version.outputs.new_tag }}
+            VERSION=${{ steps.meta.outputs.version }}
             COMMIT=${{ github.sha }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
           sbom: true
