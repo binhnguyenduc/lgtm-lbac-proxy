@@ -16,7 +16,7 @@ require (
 	github.com/slok/go-http-metrics v0.13.0
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e
+	golang.org/x/exp a4bb9ffd2546
 )
 
 require (
