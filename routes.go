@@ -53,22 +53,43 @@ func (a *App) WithRoutes() *App {
 
 // WithLoki configures and adds a set of Loki API routes to the App's router,
 // logging warnings if the Loki URL is not set, and returns the updated App.
+//
+// Routes are based on Loki HTTP API Query Endpoints:
+// https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-endpoints
 func (a *App) WithLoki() *App {
 	if a.Cfg.Loki.URL == "" {
 		log.Warn().Msg("Loki URL not set, skipping Loki routes")
 		return a
 	}
 	routes := []Route{
+		// Query Endpoints - https://grafana.com/docs/loki/latest/reference/loki-http-api/#instant-queries
 		{Url: "/api/v1/query", MatchWord: "query"},
+		// Range Queries - https://grafana.com/docs/loki/latest/reference/loki-http-api/#range-queries
 		{Url: "/api/v1/query_range", MatchWord: "query"},
-		{Url: "/api/v1/series", MatchWord: "match[]"},
-		{Url: "/api/v1/tail", MatchWord: "query"},
-		{Url: "/api/v1/index/stats", MatchWord: "query"},
-		{Url: "/api/v1/format_query", MatchWord: "query"},
+		// Labels - https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-labels
 		{Url: "/api/v1/labels", MatchWord: "query"},
+		// Label Values - https://grafana.com/docs/loki/latest/reference/loki-http-api/#query-label-values
 		{Url: "/api/v1/label/{label}/values", MatchWord: "query"},
-		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
+		// Series - https://grafana.com/docs/loki/latest/reference/loki-http-api/#series
+		{Url: "/api/v1/series", MatchWord: "match[]"},
+		// Index Stats - https://grafana.com/docs/loki/latest/reference/loki-http-api/#statistics
+		{Url: "/api/v1/index/stats", MatchWord: "query"},
+		// Index Volume - https://grafana.com/docs/loki/latest/reference/loki-http-api/#volume
+		{Url: "/api/v1/index/volume", MatchWord: "query"},
+		// Index Volume Range - https://grafana.com/docs/loki/latest/reference/loki-http-api/#volume-range
+		{Url: "/api/v1/index/volume_range", MatchWord: "query"},
+		// Patterns - https://grafana.com/docs/loki/latest/reference/loki-http-api/#detected-patterns
+		{Url: "/api/v1/patterns", MatchWord: "query"},
+		// Tail - https://grafana.com/docs/loki/latest/reference/loki-http-api/#stream-logs
+		{Url: "/api/v1/tail", MatchWord: "query"},
+		// Additional Loki endpoints (not query endpoints)
+		// Format Query - https://grafana.com/docs/loki/latest/reference/loki-http-api/#format-a-logql-query
+		{Url: "/api/v1/format_query", MatchWord: "query"},
+		// Build Info - https://grafana.com/docs/loki/latest/reference/loki-http-api/#show-build-information
 		{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
+		// Query Exemplars - Prometheus endpoint (https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars)
+		// Note: This is a Prometheus/Thanos endpoint, not a Loki endpoint, but included for compatibility
+		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
 	}
 	lokiRouter := a.e.PathPrefix("/loki").Subrouter()
 	for _, route := range routes {
@@ -86,23 +107,39 @@ func (a *App) WithLoki() *App {
 
 // WithThanos configures and adds a set of Thanos API routes to the App's router,
 // logging warnings if the Thanos URL is not set, and returns the updated App.
+//
+// Routes are based on Prometheus HTTP API:
+// https://prometheus.io/docs/prometheus/latest/querying/api/
 func (a *App) WithThanos() *App {
 	if a.Cfg.Thanos.URL == "" {
 		log.Warn().Msg("Thanos URL not set, skipping Thanos routes")
 		return a
 	}
 	routes := []Route{
+		// Query Endpoints - https://prometheus.io/docs/prometheus/latest/querying/api/#instant-queries
 		{Url: "/api/v1/query", MatchWord: "query"},
+		// Range Queries - https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries
 		{Url: "/api/v1/query_range", MatchWord: "query"},
+		// Format Query - https://prometheus.io/docs/prometheus/latest/querying/api/#formatting-query-expressions
+		{Url: "/api/v1/format_query", MatchWord: "query"},
+		// Metadata Endpoints
+		// Series - https://prometheus.io/docs/prometheus/latest/querying/api/#finding-series-by-label-matchers
 		{Url: "/api/v1/series", MatchWord: "match[]"},
+		// Labels - https://prometheus.io/docs/prometheus/latest/querying/api/#getting-label-names
+		{Url: "/api/v1/labels", MatchWord: "match[]"},
+		// Label Values - https://prometheus.io/docs/prometheus/latest/querying/api/#querying-label-values
+		{Url: "/api/v1/label/{label}/values", MatchWord: "match[]"},
+		// Query Exemplars - https://prometheus.io/docs/prometheus/latest/querying/api/#querying-exemplars
+		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
+		// Metadata - https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
+		{Url: "/api/v1/metadata", MatchWord: "query"},
+		// Status Endpoints
+		// Build Info - https://prometheus.io/docs/prometheus/latest/querying/api/#build-information
+		{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
+		// Non-Prometheus endpoints (Thanos or compatibility)
+		// Note: These endpoints are not part of standard Prometheus API
 		{Url: "/api/v1/tail", MatchWord: "query"},
 		{Url: "/api/v1/index/stats", MatchWord: "query"},
-		{Url: "/api/v1/format_query", MatchWord: "query"},
-		{Url: "/api/v1/labels", MatchWord: "match[]"},
-		{Url: "/api/v1/label/{label}/values", MatchWord: "match[]"},
-		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
-		{Url: "/api/v1/status/buildinfo", MatchWord: "query"},
-		{Url: "/api/v1/metadata", MatchWord: "query"},
 	}
 	thanosRouter := a.e.PathPrefix("").Subrouter()
 	for _, route := range routes {
