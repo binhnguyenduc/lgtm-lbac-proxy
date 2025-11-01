@@ -3,4 +3,4 @@ appVersion: 0.7.0
 description: A Helm chart for LGTM LBAC Proxy
 name: lgtm-lbac-proxy
 type: application
-version: 1.7.0
+version: 1.8.0

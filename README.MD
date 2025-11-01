@@ -126,14 +126,25 @@ docker run -d \
   ghcr.io/binhnguyenduc/lgtm-lbac-proxy:latest
 ```
 
-### Helm
+### Kubernetes (Helm)
 
 ```bash
+# Install from local chart
 helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  --namespace observability \
+  --create-namespace \
+  --set proxy.web.jwksCertUrl=https://your-oauth.com/certs \
   --set proxy.thanos.url=https://thanos-query:9091 \
   --set proxy.loki.url=https://loki-query:3100 \
-  --set proxy.tempo.url=https://tempo-query:3100
+  --set proxy.tempo.url=https://tempo-query:3200
+
+# Create labels ConfigMap
+kubectl create configmap lgtm-lbac-proxy-labels \
+  --from-file=labels.yaml=./configs/labels.yaml \
+  --namespace observability
 ```
+
+See [Helm Chart Documentation](helm/lgtm-lbac-proxy/README.md) for detailed configuration options.
 
 ---
 
@@ -236,6 +247,101 @@ rate(http_requests_total{namespace="prod"}[5m])
 
 ---
 
+## Kubernetes Deployment
+
+### Helm Chart
+
+The project includes a production-ready Helm chart for Kubernetes deployment.
+
+**Chart Version**: 1.8.0 | **App Version**: 0.7.0
+
+#### Features
+
+- ✅ **Complete LGTM Stack**: Full support for Prometheus/Thanos, Loki, and Tempo
+- ✅ **Production Ready**: Resource limits, security contexts, health probes, HPA
+- ✅ **Security Hardened**: Non-root execution, dropped capabilities, seccomp profiles
+- ✅ **Auto-scaling**: Horizontal Pod Autoscaler with CPU/memory metrics
+- ✅ **Monitoring**: ServiceMonitor for Prometheus metrics collection
+- ✅ **Vanilla Kubernetes**: No platform-specific dependencies
+
+#### Quick Installation
+
+```bash
+# Install the chart
+helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  --namespace observability \
+  --create-namespace \
+  --set proxy.web.jwksCertUrl=https://oauth.example.com/certs \
+  --set proxy.thanos.url=https://thanos-querier.monitoring.svc:9091 \
+  --set proxy.loki.url=https://loki-query-frontend.logging.svc:3100 \
+  --set proxy.tempo.url=https://tempo-query-frontend.tracing.svc:3200
+
+# Create labels ConfigMap
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lgtm-lbac-proxy-labels
+  namespace: observability
+data:
+  labels.yaml: |
+    alice@example.com:
+      prod: true
+      staging: true
+    admin-group:
+      '#cluster-wide': true
+EOF
+```
+
+#### Configuration Examples
+
+**Minimal Production:**
+```yaml
+# values.yaml
+replicas: 2
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+proxy:
+  web:
+    jwksCertUrl: https://oauth.example.com/certs
+  thanos:
+    url: https://thanos-querier.monitoring.svc:9091
+  loki:
+    url: https://loki-query-frontend.logging.svc:3100
+  tempo:
+    url: https://tempo-query-frontend.tracing.svc:3200
+```
+
+**High Availability:**
+```yaml
+replicas: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+proxy:
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
+```
+
+For complete configuration options and deployment examples, see:
+- [Helm Chart README](helm/lgtm-lbac-proxy/README.md)
+- [Helm Chart CHANGELOG](helm/lgtm-lbac-proxy/CHANGELOG.md)
+
+---
+
 ## Datasource Configuration
 
 ### Grafana Configuration
@@ -300,7 +406,8 @@ If you're migrating from the original multena-proxy, see [MIGRATION.md](MIGRATIO
 - [Configuration Guide](configs/config.yaml)
 - [Build Instructions](BUILD.md)
 - [Migration Guide](MIGRATION.md)
-- [Helm Chart README](helm/README.md)
+- [Helm Chart README](helm/lgtm-lbac-proxy/README.md)
+- [Helm Chart CHANGELOG](helm/lgtm-lbac-proxy/CHANGELOG.md)
 
 ---
 

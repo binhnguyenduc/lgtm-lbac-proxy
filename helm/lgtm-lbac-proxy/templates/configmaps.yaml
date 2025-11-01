@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "gp-multena.name" . }}-config
+  name: {{ include "lgtm-lbac-proxy.name" . }}-config
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "gp-multena.labels" . | nindent 4 }}
+    {{- include "lgtm-lbac-proxy.labels" . | nindent 4 }}
 data:
   config.yaml: |-
     log:
@@ -31,18 +31,6 @@ data:
       alert_cert_url: {{ .Values.proxy.alert.certUrl }}
       alert_cert: {{ .Values.proxy.alert.cert | quote }}
 
-    {{- if .Values.proxy.db.enabled }}
-    db:
-      enabled: true
-      user: {{ .Values.proxy.db.user }}
-      password_path: {{ .Values.proxy.db.passwordPath }}
-      host: {{ .Values.proxy.db.host }}
-      port: {{ .Values.proxy.db.port }}
-      dbName: {{ .Values.proxy.db.dbName }}
-      query: {{ .Values.proxy.db.query }}
-      token_key: {{ .Values.proxy.db.tokenKey }}
-    {{- end }}
-
     thanos:
       url: {{ .Values.proxy.thanos.url }}
       tenant_label: {{ .Values.proxy.thanos.tenantLabel }}
@@ -64,5 +52,17 @@ data:
       actor_header: {{ .Values.proxy.loki.actorHeader }}
       headers:
         {{- range $key, $value := .Values.proxy.loki.headers }}
+        {{ $key }}: {{ $value }}
+        {{- end }}
+
+    tempo:
+      url: {{ .Values.proxy.tempo.url }}
+      tenant_label: {{ .Values.proxy.tempo.tenantLabel }}
+      use_mutual_tls: {{ .Values.tls.tempo.enabled }}
+      cert: "/etc/secrets/ca/tempo/{{ .Values.tls.tempo.cert }}"
+      key: "/etc/secrets/ca/tempo/{{ .Values.tls.tempo.key }}"
+      actor_header: {{ .Values.proxy.tempo.actorHeader }}
+      headers:
+        {{- range $key, $value := .Values.proxy.tempo.headers }}
         {{ $key }}: {{ $value }}
         {{- end }}
