@@ -156,10 +156,6 @@ jobs:
             org.opencontainers.image.vendor=Fork by binhnguyenduc
             org.opencontainers.image.licenses=Apache-2.0
 
-      # Setup QEMU for multi-platform builds
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       # Setup Docker Buildx with caching
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -175,20 +171,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build multi-platform image using Containerfile.Build
-      - name: Build and push container image
+      # Build amd64 image for security scanning
+      - name: Build container image for scanning
         id: build-image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Containerfile.Build
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: false
           load: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
           build-args: |
             VERSION=${{ steps.tag_version.outputs.new_tag }}
             COMMIT=${{ github.sha }}
@@ -218,13 +213,13 @@ jobs:
           sarif_file: 'trivy-results.sarif'
           category: 'container'
 
-      # Push multi-platform image after successful scan
-      - name: Build and push multi-platform image
+      # Push amd64 image after successful scan
+      - name: Build and push amd64 image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Containerfile.Build
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
