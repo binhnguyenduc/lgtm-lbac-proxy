@@ -129,6 +129,35 @@ func validateLabels(token OAuthToken, a *App) (map[string]bool, bool, error) {
 	return tenantLabels, false, nil
 }
 
+// validateLabelPolicy retrieves and validates the label policy for the user.
+// It checks if the user is an admin and skips label enforcement if true.
+// Returns the LabelPolicy, a boolean indicating whether label enforcement should be skipped,
+// and any error that occurred during validation.
+func validateLabelPolicy(token OAuthToken, defaultLabel string, a *App) (*LabelPolicy, bool, error) {
+	if isAdmin(token, a) {
+		log.Debug().Str("user", token.PreferredUsername).Bool("Admin", true).Msg("Skipping label enforcement")
+		return nil, true, nil
+	}
+
+	policy, err := a.LabelStore.GetLabelPolicy(token.ToIdentity(), defaultLabel)
+	if err != nil {
+		return nil, false, fmt.Errorf("error getting label policy: %w", err)
+	}
+
+	// Check for cluster-wide access
+	if policy.HasClusterWideAccess() {
+		log.Debug().Str("user", token.PreferredUsername).Bool("ClusterWide", true).Msg("Skipping label enforcement")
+		return nil, true, nil
+	}
+
+	log.Debug().Str("user", token.PreferredUsername).Int("rules", len(policy.Rules)).Str("logic", policy.Logic).Msg("Label policy retrieved")
+
+	if len(policy.Rules) < 1 {
+		return nil, false, fmt.Errorf("no label rules found")
+	}
+	return policy, false, nil
+}
+
 func isAdmin(token OAuthToken, a *App) bool {
 	return ContainsIgnoreCase(token.Groups, a.Cfg.Admin.Group) && a.Cfg.Admin.Bypass
 }

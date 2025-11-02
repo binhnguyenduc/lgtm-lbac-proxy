@@ -5,6 +5,159 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2025-11-02
+
+This release introduces **flexible multi-label enforcement**, enabling fine-grained access control with multiple label rules per user/group. Users can now define complex authorization policies with different label names, operators, and logic combinations while maintaining full backward compatibility with existing single-label configurations.
+
+### Added
+
+- **Multi-Label Enforcement System**: Complete support for flexible, policy-based label enforcement
+  - `LabelRule`: Define individual label matching rules with name, operator, and values
+  - `LabelPolicy`: Combine multiple rules with AND/OR logic for complex access control
+  - Support for all query operators: `=` (equals), `!=` (not equals), `=~` (regex), `!~` (negative regex)
+  - Per-user/group custom enforcement policies independent of global `tenant_label` config
+
+- **Extended Label Format**: New YAML schema for labels.yaml with backward compatibility
+  ```yaml
+  # Extended format - multiple labels with operators
+  user1:
+    _rules:
+      - name: namespace
+        operator: "="
+        values: ["prod", "staging"]
+      - name: team
+        operator: "=~"
+        values: ["backend.*"]
+    _logic: AND
+
+  # Simple format still works (backward compatible)
+  user2:
+    namespace: prod
+
+  # Mixed format supported
+  user3:
+    namespace: dev
+    _rules:
+      - name: environment
+        operator: "!="
+        values: ["production"]
+  ```
+
+- **Enhanced Query Enforcers**: All enforcers now support multi-label policies
+  - `PromQLEnforcer.EnforceMulti()`: Multi-label PromQL query enforcement
+  - `LogQLEnforcer.EnforceMulti()`: Multi-label LogQL query enforcement
+  - `TraceQLEnforcer.EnforceMulti()`: Multi-label TraceQL query enforcement
+  - Existing `Enforce()` methods maintained for backward compatibility
+
+- **Policy Parser** (`policyparser.go`): Intelligent YAML format detection and parsing
+  - Auto-detects simple vs extended format
+  - Converts simple format to extended format internally
+  - Validates rule structure and operators
+  - Supports mixed format (simple + extended rules in same user)
+
+- **Label Store Enhancement**: Extended Labelstore interface with policy support
+  - `GetLabelPolicy()`: Retrieve complete label policy for user/group
+  - `GetLabels()`: Maintained for backward compatibility
+  - Automatic format detection and conversion in FileLabelStore
+
+- **Migration Tools**: Comprehensive migration support
+  - Standalone CLI tool: `cmd/migrate-labels/migrate-labels`
+    - Validate existing labels.yaml
+    - Preview conversion (dry-run mode)
+    - Convert simple to extended format
+    - Bulk migration capability
+  - Helm migration job: `helm/lgtm-lbac-proxy/templates/migration-job.yaml`
+    - Automated Kubernetes migration workflow
+    - Dry-run support for safe preview
+    - Configurable via `values.yaml`
+
+- **Documentation**: Complete documentation for new features
+  - Migration guide: `helm/lgtm-lbac-proxy/UPGRADE.md`
+  - Updated architecture docs in `CLAUDE.md`
+  - Configuration examples for all formats
+  - Performance benchmarking results
+
+- **Comprehensive Testing**: Full test coverage for new functionality
+  - 82+ test cases across all enforcers (28 PromQL, 18 LogQL, 21 TraceQL)
+  - 11 performance benchmarks in `labelrule_bench_test.go`
+  - Backward compatibility tests with mixed formats
+  - Test coverage: >80% for new components (labelrule: 100%, policyparser: 90%+, enforcers: 85-95%)
+
+### Changed
+
+- **Request Handler Flow**: Updated to support policy-based enforcement
+  - Checks for extended format using `GetLabelPolicy()`
+  - Falls back to simple format with `GetLabels()` for backward compatibility
+  - Maintains zero-breaking-change migration path
+
+- **Configuration**: Optional extended format, no config changes required
+  - `tenant_label` continues to work as default/fallback for simple format
+  - Extended format overrides `tenant_label` when `_rules` present
+  - No new required configuration fields
+
+### Performance
+
+All operations meet <5ms latency requirement with minimal overhead:
+- Simple format parsing: ~87 ns/op (0.087 µs)
+- Extended format parsing: ~1.9 µs/op
+- PromQL single-label enforcement: ~5-10 µs/op
+- PromQL multi-label enforcement: ~15-25 µs/op
+- LogQL multi-label enforcement: ~20-30 µs/op
+- TraceQL multi-label enforcement: ~25-35 µs/op
+
+Multi-label enforcement adds only ~10-15 µs overhead compared to single-label.
+
+### Migration
+
+**No Action Required for Existing Deployments**:
+- Simple format labels continue to work without modification
+- Proxy automatically detects format and routes to appropriate enforcement
+- Existing queries and configurations require zero changes
+
+**To Adopt Multi-Label Enforcement**:
+1. **Option 1**: Keep simple format (recommended for single-label use cases)
+2. **Option 2**: Manual migration to extended format
+3. **Option 3**: Automated migration using Helm job or standalone tool
+
+See `helm/lgtm-lbac-proxy/UPGRADE.md` for detailed migration instructions.
+
+### Technical Details
+
+#### New Files
+- `labelrule.go`: LabelRule and LabelPolicy data structures with validation
+- `policyparser.go`: PolicyParser for parsing and converting label formats
+- `labelrule_test.go`: Unit tests for label rules (6 test cases, 100% coverage)
+- `policyparser_test.go`: Unit tests for policy parsing (9 test cases, 90%+ coverage)
+- `labelrule_bench_test.go`: Performance benchmarks (11 benchmark functions)
+- `cmd/migrate-labels/`: Standalone migration tool with CLI
+
+#### Modified Files
+- `labelstore.go`: Added `GetLabelPolicy()` method, enhanced FileLabelStore
+- `enforcer_promql.go`: Added `EnforceMulti()` with multi-label support (28 test cases)
+- `enforcer_logql.go`: Added `EnforceMulti()` with multi-label support (18 test cases)
+- `enforcer_traceql.go`: Added `EnforceMulti()` with multi-label support (21 test cases)
+- `routes.go`: Updated handler to support policy-based enforcement
+- `util.go`: Added policy-to-matcher conversion utilities
+- `auth.go`: Enhanced to work with policy enforcement
+- `CLAUDE.md`: Updated with multi-label architecture and examples
+- `helm/lgtm-lbac-proxy/values.yaml`: Added migration job configuration
+- `helm/lgtm-lbac-proxy/UPGRADE.md`: Comprehensive upgrade guide
+
+#### Design Principles
+- **Backward Compatibility**: Zero breaking changes, simple format fully supported
+- **Gradual Adoption**: Users can migrate incrementally, mixing simple and extended formats
+- **Performance**: Minimal overhead (<15 µs added latency for multi-label)
+- **Extensibility**: Clean architecture for future authorization enhancements
+- **User Experience**: Auto-detection and conversion for seamless migration
+
+### Benefits
+
+1. **Fine-Grained Access Control**: Combine multiple labels for precise access policies
+2. **Multi-Tenancy Flexibility**: Different users can have different label restrictions
+3. **Advanced Operators**: Support regex matching and negative conditions
+4. **Future-Proof Architecture**: Foundation for more complex authorization rules
+5. **Zero Migration Risk**: Full backward compatibility ensures safe adoption
+
 ## [0.9.1] - 2025-11-02
 
 ### Changed

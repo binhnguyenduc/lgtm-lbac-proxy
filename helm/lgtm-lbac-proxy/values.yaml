@@ -6,16 +6,16 @@ proxy:
     group: gepardec-run-admins # group name for admin bypass
   thanos:
     url: https://thanos-querier.monitoring.svc.cluster.local:9091
-    tenantLabel: namespace
+    tenantLabel: namespace  # Default label name for simple format; used as fallback
   loki:
     url: https://loki-query-frontend-http.logging.svc.cluster.local:3100
-    tenantLabel: kubernetes_namespace_name
+    tenantLabel: kubernetes_namespace_name  # Default label name for simple format; used as fallback
     actorHeader: X-Loki-Actor-Path
     headers:
       X-Scope-OrgID: application
   tempo:
     url: https://tempo-query-frontend.tracing.svc.cluster.local:3200
-    tenantLabel: resource.namespace
+    tenantLabel: resource.namespace  # Default label name for simple format; used as fallback
     actorHeader: ""
     headers: {}
   alert:
@@ -31,6 +31,28 @@ proxy:
     configPaths: # paths to search for label configuration files
       - /etc/config/labels/ # Kubernetes ConfigMap mount path
       - ./configs # Local development path
+    # Label Store Format:
+    # The label store supports both simple and extended formats.
+    #
+    # Simple Format (backward compatible):
+    #   user1:
+    #     namespace1: true
+    #     namespace2: true
+    #
+    # Extended Format (multi-label with operators):
+    #   user2:
+    #     _rules:
+    #       - name: namespace
+    #         operator: "="
+    #         values: ["prod", "staging"]
+    #       - name: team
+    #         operator: "=~"
+    #         values: ["backend.*"]
+    #     _logic: AND  # Combine rules with AND or OR
+    #
+    # Supported operators: "=", "!=", "=~", "!~"
+    # tenant_label fields above serve as default label name for simple format
+    # See migration tool: ./migrate-labels for bulk conversion
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65534
@@ -104,4 +126,29 @@ resources:
     cpu: 200m
     memory: 128Mi
 
+# Label Migration Job
+# Optional Kubernetes Job to migrate labels from simple to extended format
+migration:
+  enabled: false  # Enable to run migration job
+  dryRun: true    # Set to false to actually perform migration
+  defaultLabel: namespace  # Default label name for conversion
+  labelsConfigMap: ""  # Override labels ConfigMap name (default: <release>-labels)
+
+  # Helm hook configuration
+  hookType: pre-upgrade  # Run before upgrade (or: pre-install, post-install, manual)
+  hookWeight: "-5"       # Hook execution order
+  hookDeletePolicy: before-hook-creation  # Delete old job before creating new one
+
+  # Job configuration
+  backoffLimit: 3
+  restartPolicy: Never
+
+  # Resource limits for migration job
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
 

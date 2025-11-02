@@ -3,6 +3,8 @@ package main
 import (
 	"sort"
 	"strings"
+
+	"github.com/prometheus/prometheus/model/labels"
 )
 
 func ContainsIgnoreCase(s []string, e string) bool {
@@ -29,4 +31,40 @@ func MapKeysToArray[K comparable, V any](tenantLabel map[K]V) []K {
 	}
 
 	return tenantLabelKeys
+}
+
+// ruleToMatcher converts a LabelRule to a prometheus labels.Matcher.
+// This is a shared utility function used by both PromQL and LogQL enforcers.
+func ruleToMatcher(rule LabelRule) *labels.Matcher {
+	var matchType labels.MatchType
+	operator := rule.Operator
+	value := rule.Values[0]
+
+	// For multiple values, combine with regex OR
+	if len(rule.Values) > 1 {
+		value = strings.Join(rule.Values, "|")
+		if operator == OperatorEquals {
+			operator = OperatorRegexMatch
+		} else if operator == OperatorNotEquals {
+			operator = OperatorRegexNoMatch
+		}
+	}
+
+	// Map operator to MatchType
+	switch operator {
+	case OperatorEquals:
+		matchType = labels.MatchEqual
+	case OperatorNotEquals:
+		matchType = labels.MatchNotEqual
+	case OperatorRegexMatch:
+		matchType = labels.MatchRegexp
+	case OperatorRegexNoMatch:
+		matchType = labels.MatchNotRegexp
+	}
+
+	return &labels.Matcher{
+		Name:  rule.Name,
+		Type:  matchType,
+		Value: value,
+	}
 }

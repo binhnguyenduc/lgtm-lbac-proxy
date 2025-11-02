@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/rs/zerolog/log"
+	"fmt"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
@@ -21,6 +22,8 @@ type Labelstore interface {
 	Connect(config LabelStoreConfig) error
 
 	// GetLabels retrieves tenant labels for the given user identity.
+	// DEPRECATED: Use GetLabelPolicy for new implementations.
+	// This method is maintained for backward compatibility.
 	//
 	// Parameters:
 	//   - identity: User identity containing username and group memberships
@@ -34,6 +37,23 @@ type Labelstore interface {
 	//   - Returns (map, false) for normal users with specific tenant labels
 	//   - Returns (empty map, false) if user has no labels configured
 	GetLabels(identity UserIdentity) (map[string]bool, bool)
+
+	// GetLabelPolicy retrieves the complete label policy for the given user identity.
+	// This method supports multi-label enforcement with flexible operators and logic.
+	//
+	// Parameters:
+	//   - identity: User identity containing username and group memberships
+	//   - defaultLabel: Default label name to use if simple format is detected
+	//
+	// Returns:
+	//   - *LabelPolicy: Complete policy with rules, logic, and override settings
+	//   - error: Error if policy cannot be retrieved or is invalid
+	//
+	// Behavior:
+	//   - Returns nil error and policy with cluster-wide access for #cluster-wide users
+	//   - Returns policy with merged rules from user and group memberships
+	//   - Returns error if user has no labels configured
+	GetLabelPolicy(identity UserIdentity, defaultLabel string) (*LabelPolicy, error)
 }
 
 // WithLabelStore initializes and connects to the file-based label store.
@@ -49,10 +69,20 @@ func (a *App) WithLabelStore() *App {
 }
 
 type FileLabelStore struct {
-	labels map[string]map[string]bool
+	labels       map[string]map[string]bool    // Legacy simple format
+	rawData      map[string]RawLabelData       // Raw YAML data for extended format
+	parser       *PolicyParser                 // Parser for converting to policies
+	policyCache  map[string]*LabelPolicy       // Cache of parsed policies
+	useExtended  bool                          // Whether extended format is in use
 }
 
 func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
+	// Initialize parser and cache
+	c.parser = NewPolicyParser()
+	c.policyCache = make(map[string]*LabelPolicy)
+	c.rawData = make(map[string]RawLabelData)
+	c.labels = make(map[string]map[string]bool)
+
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("labels")
 	v.SetConfigType("yaml")
@@ -66,24 +96,61 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 	if err != nil {
 		return err
 	}
-	err = v.Unmarshal(&c.labels)
+
+	// Load raw data for extended format support
+	err = c.loadLabels(v)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
+		log.Fatal().Err(err).Msg("Error while loading label configuration")
 		return err
 	}
+
+	// Watch for configuration changes
 	v.OnConfigChange(func(e fsnotify.Event) {
 		log.Info().Str("file", e.Name).Msg("Config file changed")
 		err = v.MergeInConfig()
 		if err != nil {
-			log.Fatal().Err(err).Msg("Error while unmarshalling config file")
+			log.Fatal().Err(err).Msg("Error while reloading config file")
 		}
-		err = v.Unmarshal(&c.labels)
+		err = c.loadLabels(v)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Error while unmarshalling config file")
+			log.Fatal().Err(err).Msg("Error while reloading label configuration")
 		}
 	})
 	v.WatchConfig()
-	log.Debug().Any("labels", c.labels).Msg("")
+
+	log.Debug().Bool("extended", c.useExtended).Msg("Label store connected")
+	return nil
+}
+
+// loadLabels loads label configuration from viper and detects the format
+func (c *FileLabelStore) loadLabels(v *viper.Viper) error {
+	// Try to unmarshal as raw data first
+	rawData := make(map[string]RawLabelData)
+	if err := v.Unmarshal(&rawData); err != nil {
+		return err
+	}
+
+	// Detect if any user/group uses extended format
+	c.useExtended = false
+	for _, userData := range rawData {
+		if IsExtendedFormat(userData) {
+			c.useExtended = true
+			break
+		}
+	}
+
+	c.rawData = rawData
+
+	// Also maintain backward compatible simple format
+	c.labels = make(map[string]map[string]bool)
+	if err := v.Unmarshal(&c.labels); err != nil {
+		log.Warn().Err(err).Msg("Could not unmarshal to simple format, using extended format only")
+	}
+
+	// Clear policy cache on reload
+	c.policyCache = make(map[string]*LabelPolicy)
+
+	log.Debug().Any("rawData", c.rawData).Msg("Labels loaded")
 	return nil
 }
 
@@ -106,4 +173,112 @@ func (c *FileLabelStore) GetLabels(identity UserIdentity) (map[string]bool, bool
 		}
 	}
 	return mergedNamespaces, false
+}
+
+// GetLabelPolicy retrieves the label policy for a user/group identity.
+// It supports both simple and extended YAML formats.
+func (c *FileLabelStore) GetLabelPolicy(identity UserIdentity, defaultLabel string) (*LabelPolicy, error) {
+	username := identity.Username
+	groups := identity.Groups
+
+	// Check cache first
+	cacheKey := username
+	if cached, ok := c.policyCache[cacheKey]; ok {
+		return cached, nil
+	}
+
+	// Collect all policies (user + groups)
+	var policies []*LabelPolicy
+
+	// User policy
+	if userData, ok := c.rawData[username]; ok {
+		policy, err := c.parser.ParseUserPolicy(userData, defaultLabel)
+		if err != nil {
+			log.Warn().Err(err).Str("user", username).Msg("Failed to parse user policy")
+		} else {
+			policies = append(policies, policy)
+		}
+	}
+
+	// Group policies
+	for _, group := range groups {
+		if groupData, ok := c.rawData[group]; ok {
+			policy, err := c.parser.ParseUserPolicy(groupData, defaultLabel)
+			if err != nil {
+				log.Warn().Err(err).Str("group", group).Msg("Failed to parse group policy")
+			} else {
+				policies = append(policies, policy)
+			}
+		}
+	}
+
+	if len(policies) == 0 {
+		return nil, fmt.Errorf("no policy found for user %s", username)
+	}
+
+	// Merge policies
+	mergedPolicy := c.mergePolicies(policies)
+
+	// Check for cluster-wide access
+	if mergedPolicy.HasClusterWideAccess() {
+		mergedPolicy = &LabelPolicy{
+			Rules: []LabelRule{{Name: "#cluster-wide", Operator: OperatorEquals, Values: []string{"true"}}},
+			Logic: LogicAND,
+		}
+	}
+
+	// Cache the merged policy
+	c.policyCache[cacheKey] = mergedPolicy
+
+	return mergedPolicy, nil
+}
+
+// mergePolicies combines multiple policies into a single policy.
+// Rules are merged with OR logic by default (user can access if any policy allows).
+func (c *FileLabelStore) mergePolicies(policies []*LabelPolicy) *LabelPolicy {
+	if len(policies) == 0 {
+		return &LabelPolicy{Rules: []LabelRule{}, Logic: LogicAND}
+	}
+
+	if len(policies) == 1 {
+		return policies[0]
+	}
+
+	// Merge all rules from all policies
+	merged := &LabelPolicy{
+		Rules: []LabelRule{},
+		Logic: LogicOR, // Multiple policies are combined with OR (more permissive)
+	}
+
+	for _, policy := range policies {
+		if policy.Override {
+			// If a policy has Override=true, it replaces all previous policies
+			merged.Rules = policy.Rules
+			merged.Logic = policy.Logic
+			continue
+		}
+		merged.Rules = append(merged.Rules, policy.Rules...)
+	}
+
+	// Deduplicate rules
+	merged.Rules = c.deduplicateRules(merged.Rules)
+
+	return merged
+}
+
+// deduplicateRules removes duplicate rules from a slice
+func (c *FileLabelStore) deduplicateRules(rules []LabelRule) []LabelRule {
+	seen := make(map[string]bool)
+	result := []LabelRule{}
+
+	for _, rule := range rules {
+		// Create a unique key for the rule
+		key := fmt.Sprintf("%s|%s|%v", rule.Name, rule.Operator, rule.Values)
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, rule)
+		}
+	}
+
+	return result
 }
