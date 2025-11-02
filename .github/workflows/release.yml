@@ -147,8 +147,8 @@ jobs:
             # Latest tag only for main branch
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=Multena Proxy
-            org.opencontainers.image.description=Multi-tenancy authorization proxy for LGTM stack
+            org.opencontainers.image.title=LGTM LBAC Proxy
+            org.opencontainers.image.description=Multi-tenancy Label-Based Access Control proxy for LGTM stack
             org.opencontainers.image.vendor=Fork by binhnguyenduc
             org.opencontainers.image.licenses=Apache-2.0
 

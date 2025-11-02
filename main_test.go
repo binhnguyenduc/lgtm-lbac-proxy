@@ -349,7 +349,7 @@ func Test_reverseProxy(t *testing.T) {
 func TestAlertAuth(t *testing.T) {
 	app, tokens := setupTestMain()
 	app.Cfg.Alert.Enabled = true
-	app.Cfg.Alert.TokenHeader = "X-Multena-Alert-Token"
+	app.Cfg.Alert.TokenHeader = "X-LGTM-Alert-Token"
 	app.Cfg.Alert.CertURL = "http://localhost:8080/jwks"
 
 	log.Level(2)

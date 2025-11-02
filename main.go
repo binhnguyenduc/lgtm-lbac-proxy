@@ -65,7 +65,7 @@ func (a *App) StartServer() {
 	go func() {
 		mdlw := middleware.New(middleware.Config{
 			Recorder: metrics.NewRecorder(metrics.Config{}),
-			Service:  "multena",
+			Service:  "lgtm_lbac_proxy",
 		})
 
 		if err := http.ListenAndServe(fmt.Sprintf("%s:%d", a.Cfg.Web.Host, a.Cfg.Web.ProxyPort), std.Handler("/", mdlw, a.e)); err != nil {

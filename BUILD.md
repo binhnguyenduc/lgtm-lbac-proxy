@@ -1,6 +1,6 @@
 # Container Build Guide
 
-This document explains how to build and use the optimized container images for Multena Proxy.
+This document explains how to build and use the optimized container images for LGTM LBAC Proxy.
 
 ## 📦 Available Containerfiles
 

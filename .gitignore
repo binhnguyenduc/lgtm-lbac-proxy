@@ -11,6 +11,7 @@ vendor
 vendor/
 multena-proxy
 multena-proxy.iml
+lgtm-lbac-proxy
 ./.idea/
 .idea/
 .idea/*

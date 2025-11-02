@@ -20,7 +20,7 @@ proxy:
     headers: {}
   alert:
     enabled: false # enable alerting
-    tokenHeader: X-Multena-alert # header to use for the token
+    tokenHeader: X-LGTM-Alert # header to use for the token
     certUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
     cert: '' # local jwks cert
   web:

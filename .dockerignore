@@ -23,6 +23,7 @@ claudedocs/
 
 # Build artifacts
 multena-proxy
+lgtm-lbac-proxy
 *.exe
 *.dll
 *.so
