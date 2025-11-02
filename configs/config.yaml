@@ -8,7 +8,6 @@ web:
   host: localhost # host to listen on
   tls_verify_skip: true # skip tls verification very insecurely!!!
   trusted_root_ca_path: "./certs/" # path to trusted root ca
-  label_store_kind: "configmap" # label provider either configmap or mysql
   jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs # url to jwks cert of oauth provider
   oauth_group_name: "groups" # name of the group field in the jwt
 
@@ -25,16 +24,6 @@ alert:
 dev:
   enabled: false # enable dev mode, but dont use in production
   username: example # username for dev mode
-
-db:
-  enabled: false # enable mysql label provider
-  user: multitenant # user for mysql
-  password_path: "." # path to the password file
-  host: localhost # host of the db
-  port: 3306 # port of the db
-  dbName: example # name of the db
-  query: "SELECT * FROM users WHERE username = ?" # sql query to execute, must return a list of allowed labels
-  token_key: "email" # field in the jwt to use in the sql query
 
 thanos:
   url: https://localhost:9091 # url to thanos querier

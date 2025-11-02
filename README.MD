@@ -56,7 +56,7 @@ The proxy intercepts queries to Prometheus/Thanos, Loki, and Tempo, validates JW
 | **LGTM Stack Coverage** | Complete support for Metrics (Prometheus/Thanos/Mimir), Logs (Loki), and Traces (Tempo) |
 | **Label-Based Access Control** | Fine-grained access control based on tenant labels (namespace, team, environment, etc.) |
 | **JWT Authentication** | Secure authentication via OAuth/OIDC with JWKS validation |
-| **Flexible Label Stores** | ConfigMap or MySQL-based label storage |
+| **File-Based Label Store** | Simple and portable ConfigMap/file-based label storage |
 | **Query Enforcement** | Automatic injection of tenant filters into PromQL, LogQL, and TraceQL queries |
 | **Admin Bypass** | Optional admin group with cluster-wide access |
 | **Multi-Tenant Support** | Single user can access multiple tenant namespaces |
@@ -157,7 +157,6 @@ Create `config.yaml`:
 ```yaml
 web:
   jwks_cert_url: "https://your-oauth-provider.com/certs"
-  label_store_kind: configmap  # or "mysql"
   oauth_group_name: "groups"
   auth_header: "Authorization"  # Configurable auth header name
 
@@ -204,6 +203,42 @@ engineering-team:
 cluster-admins:
   "#cluster-wide": true
 ```
+
+### Migration from MySQL Label Store
+
+If you're upgrading from a version that used MySQL label store:
+
+**Step 1: Export labels from MySQL**
+```sql
+-- Export user labels
+SELECT username, allowed_labels FROM label_mappings;
+```
+
+**Step 2: Convert to YAML format**
+
+Create `labels.yaml`:
+```yaml
+# Convert MySQL rows to YAML format
+username1:
+  namespace1: true
+  namespace2: true
+group1:
+  namespace3: true
+```
+
+**Step 3: Update configuration**
+Remove these fields from `config.yaml`:
+- `web.label_store_kind` (no longer needed)
+- `db:` section (entire section)
+
+**Step 4: Deploy labels ConfigMap**
+```bash
+kubectl create configmap lgtm-lbac-proxy-labels \
+  --from-file=labels.yaml=./labels.yaml \
+  --namespace observability
+```
+
+**Note**: The label store now automatically uses file-based ConfigMap mode. For custom label store implementations (e.g., external databases, LDAP), see the `contrib/labelstores/` directory.
 
 ---
 

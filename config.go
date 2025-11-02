@@ -26,7 +26,6 @@ type WebConfig struct {
 	Host                string `mapstructure:"host"`
 	TLSVerifySkip       bool   `mapstructure:"tls_verify_skip"`
 	TrustedRootCaPath   string `mapstructure:"trusted_root_ca_path"`
-	LabelStoreKind      string `mapstructure:"label_store_kind"`
 	JwksCertURL         string `mapstructure:"jwks_cert_url"`
 	OAuthGroupName      string `mapstructure:"oauth_group_name"`
 	ServiceAccountToken string `mapstructure:"service_account_token"`
@@ -48,17 +47,6 @@ type AlertConfig struct {
 type DevConfig struct {
 	Enabled  bool   `mapstructure:"enabled"`
 	Username string `mapstructure:"username"`
-}
-
-type DbConfig struct {
-	Enabled      bool   `mapstructure:"enabled"`
-	User         string `mapstructure:"user"`
-	PasswordPath string `mapstructure:"password_path"`
-	Host         string `mapstructure:"host"`
-	Port         int    `mapstructure:"port"`
-	DbName       string `mapstructure:"dbName"`
-	Query        string `mapstructure:"query"`
-	TokenKey     string `mapstructure:"token_key"`
 }
 
 type ThanosConfig struct {
@@ -97,7 +85,6 @@ type Config struct {
 	Admin  AdminConfig  `mapstructure:"admin"`
 	Alert  AlertConfig  `mapstructure:"alert"`
 	Dev    DevConfig    `mapstructure:"dev"`
-	Db     DbConfig     `mapstructure:"db"`
 	Thanos ThanosConfig `mapstructure:"thanos"`
 	Loki   LokiConfig   `mapstructure:"loki"`
 	Tempo  TempoConfig  `mapstructure:"tempo"`
