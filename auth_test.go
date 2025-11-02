@@ -62,49 +62,6 @@ func TestParseJwtToken_InvalidToken(t *testing.T) {
 	assert.Equal(t, OAuthToken{}, oauthToken)
 }
 
-func TestValidateLabels_AdminUser(t *testing.T) {
-	app, tokens := setupTestMain()
-	tokenString := tokens["adminUserToken"]
-
-	oauthToken, _, _ := parseJwtToken(tokenString, &app)
-
-	app.Cfg.Admin.Group = "admins"
-	app.Cfg.Admin.Bypass = true
-
-	tenantLabels, skip, err := validateLabels(oauthToken, &app)
-
-	assert.NoError(t, err)
-	assert.True(t, skip)
-	assert.Nil(t, tenantLabels)
-}
-
-func TestValidateLabels_NonAdminUserWithValidLabels(t *testing.T) {
-	app, tokens := setupTestMain()
-	tokenString := tokens["userTenant"]
-
-	oauthToken, _, _ := parseJwtToken(tokenString, &app)
-
-	tenantLabels, skip, err := validateLabels(oauthToken, &app)
-
-	assert.NoError(t, err)
-	assert.False(t, skip)
-	assert.NotNil(t, tenantLabels)
-	assert.Contains(t, tenantLabels, "allowed_user")
-}
-
-func TestValidateLabels_NonAdminUserWithoutLabels(t *testing.T) {
-	app, tokens := setupTestMain()
-	tokenString := tokens["noTenant"]
-
-	oauthToken, _, _ := parseJwtToken(tokenString, &app)
-
-	tenantLabels, skip, err := validateLabels(oauthToken, &app)
-
-	assert.Error(t, err)
-	assert.False(t, skip)
-	assert.Nil(t, tenantLabels)
-}
-
 func TestIsAdmin_ValidAdminUser(t *testing.T) {
 	app, tokens := setupTestMain()
 	tokenString := tokens["adminUserToken"]

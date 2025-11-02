@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
@@ -21,29 +22,12 @@ type Labelstore interface {
 	// Returns error if connection fails or configuration is invalid.
 	Connect(config LabelStoreConfig) error
 
-	// GetLabels retrieves tenant labels for the given user identity.
-	// DEPRECATED: Use GetLabelPolicy for new implementations.
-	// This method is maintained for backward compatibility.
-	//
-	// Parameters:
-	//   - identity: User identity containing username and group memberships
-	//
-	// Returns:
-	//   - map[string]bool: Allowed tenant label values (keys), values always true
-	//   - bool: True if user has cluster-wide access (#cluster-wide label)
-	//
-	// Behavior:
-	//   - Returns (nil, true) for cluster-wide access users
-	//   - Returns (map, false) for normal users with specific tenant labels
-	//   - Returns (empty map, false) if user has no labels configured
-	GetLabels(identity UserIdentity) (map[string]bool, bool)
-
 	// GetLabelPolicy retrieves the complete label policy for the given user identity.
 	// This method supports multi-label enforcement with flexible operators and logic.
 	//
 	// Parameters:
 	//   - identity: User identity containing username and group memberships
-	//   - defaultLabel: Default label name to use if simple format is detected
+	//   - defaultLabel: Default label name to use for policy rules
 	//
 	// Returns:
 	//   - *LabelPolicy: Complete policy with rules, logic, and override settings
@@ -69,11 +53,9 @@ func (a *App) WithLabelStore() *App {
 }
 
 type FileLabelStore struct {
-	labels       map[string]map[string]bool    // Legacy simple format
-	rawData      map[string]RawLabelData       // Raw YAML data for extended format
-	parser       *PolicyParser                 // Parser for converting to policies
-	policyCache  map[string]*LabelPolicy       // Cache of parsed policies
-	useExtended  bool                          // Whether extended format is in use
+	rawData     map[string]RawLabelData // Raw YAML data for extended format
+	parser      *PolicyParser           // Parser for converting to policies
+	policyCache map[string]*LabelPolicy // Cache of parsed policies
 }
 
 func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
@@ -81,7 +63,6 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 	c.parser = NewPolicyParser()
 	c.policyCache = make(map[string]*LabelPolicy)
 	c.rawData = make(map[string]RawLabelData)
-	c.labels = make(map[string]map[string]bool)
 
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("labels")
@@ -118,34 +99,48 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 	})
 	v.WatchConfig()
 
-	log.Debug().Bool("extended", c.useExtended).Msg("Label store connected")
+	log.Debug().Msg("Label store connected")
 	return nil
 }
 
-// loadLabels loads label configuration from viper and detects the format
+// loadLabels loads label configuration from viper (extended format only)
 func (c *FileLabelStore) loadLabels(v *viper.Viper) error {
-	// Try to unmarshal as raw data first
+	// Unmarshal as raw data
 	rawData := make(map[string]RawLabelData)
 	if err := v.Unmarshal(&rawData); err != nil {
 		return err
 	}
 
-	// Detect if any user/group uses extended format
-	c.useExtended = false
-	for _, userData := range rawData {
-		if IsExtendedFormat(userData) {
-			c.useExtended = true
-			break
+	// Validate format at startup - detect simple format early
+	simpleFormatCount := 0
+	for key, data := range rawData {
+		if _, hasRules := data["_rules"]; !hasRules {
+			// Skip cluster-wide entries
+			if _, hasClusterWide := data["#cluster-wide"]; hasClusterWide {
+				continue
+			}
+			// Check if this looks like simple format
+			if len(data) > 0 {
+				simpleFormatCount++
+				log.Error().
+					Str("entry", key).
+					Msg("DEPRECATED FORMAT: Simple label format detected - migration required before v0.12.0+")
+			}
 		}
 	}
 
-	c.rawData = rawData
-
-	// Also maintain backward compatible simple format
-	c.labels = make(map[string]map[string]bool)
-	if err := v.Unmarshal(&c.labels); err != nil {
-		log.Warn().Err(err).Msg("Could not unmarshal to simple format, using extended format only")
+	// Fail fast on startup if simple format is detected
+	if simpleFormatCount > 0 {
+		return fmt.Errorf("DEPRECATED FORMAT: %d entries in simple format detected\n\n"+
+			"The simple label format is no longer supported in v0.12.0+\n"+
+			"All entries must use the extended format with _rules key.\n\n"+
+			"Migration Required:\n"+
+			"  1. Run pre-upgrade check: ./scripts/pre-upgrade-check.sh\n"+
+			"  2. Use migration tool: cd cmd/migrate-labels && go build && ./migrate-labels -input ../../configs/labels.yaml\n\n"+
+			"See cmd/migrate-labels/README.md for detailed instructions", simpleFormatCount)
 	}
+
+	c.rawData = rawData
 
 	// Clear policy cache on reload
 	c.policyCache = make(map[string]*LabelPolicy)
@@ -154,35 +149,14 @@ func (c *FileLabelStore) loadLabels(v *viper.Viper) error {
 	return nil
 }
 
-func (c *FileLabelStore) GetLabels(identity UserIdentity) (map[string]bool, bool) {
-	username := identity.Username
-	groups := identity.Groups
-	mergedNamespaces := make(map[string]bool, len(c.labels[username])*2)
-	for k := range c.labels[username] {
-		mergedNamespaces[k] = true
-		if k == "#cluster-wide" {
-			return nil, true
-		}
-	}
-	for _, group := range groups {
-		for k := range c.labels[group] {
-			mergedNamespaces[k] = true
-			if k == "#cluster-wide" {
-				return nil, true
-			}
-		}
-	}
-	return mergedNamespaces, false
-}
-
 // GetLabelPolicy retrieves the label policy for a user/group identity.
-// It supports both simple and extended YAML formats.
+// It requires the extended YAML format with _rules key.
 func (c *FileLabelStore) GetLabelPolicy(identity UserIdentity, defaultLabel string) (*LabelPolicy, error) {
 	username := identity.Username
 	groups := identity.Groups
 
-	// Check cache first
-	cacheKey := username
+	// Check cache first - cache key includes username and groups to handle different group memberships
+	cacheKey := username + ":" + strings.Join(groups, ",")
 	if cached, ok := c.policyCache[cacheKey]; ok {
 		return cached, nil
 	}

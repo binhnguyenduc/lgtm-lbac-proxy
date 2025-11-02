@@ -153,12 +153,48 @@ func setupTestMain() (App, map[string]string) {
 	app.Cfg.Thanos.TenantLabel = "tenant_id"
 	app.Cfg.Loki.TenantLabel = "tenant_id"
 
+	// Create a mock label store with extended format policies
+	parser := NewPolicyParser()
 	cmh := FileLabelStore{
-		labels: map[string]map[string]bool{
-			"user":   {"allowed_user": true, "also_allowed_user": true},
-			"group1": {"allowed_group1": true, "also_allowed_group1": true},
-			"group2": {"allowed_group2": true, "also_allowed_group2": true},
-			"admins": {"admin_label": true},
+		parser:      parser,
+		policyCache: make(map[string]*LabelPolicy),
+		rawData: map[string]RawLabelData{
+			"user": {
+				"_rules": []interface{}{
+					map[string]interface{}{
+						"name":     "tenant_id",
+						"operator": "=",
+						"values":   []interface{}{"allowed_user", "also_allowed_user"},
+					},
+				},
+			},
+			"group1": {
+				"_rules": []interface{}{
+					map[string]interface{}{
+						"name":     "tenant_id",
+						"operator": "=",
+						"values":   []interface{}{"allowed_group1", "also_allowed_group1"},
+					},
+				},
+			},
+			"group2": {
+				"_rules": []interface{}{
+					map[string]interface{}{
+						"name":     "tenant_id",
+						"operator": "=",
+						"values":   []interface{}{"allowed_group2", "also_allowed_group2"},
+					},
+				},
+			},
+			"admins": {
+				"_rules": []interface{}{
+					map[string]interface{}{
+						"name":     "tenant_id",
+						"operator": "=",
+						"values":   []interface{}{"admin_label"},
+					},
+				},
+			},
 		},
 	}
 
@@ -198,7 +234,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "error parsing token\nno tenant labels found\n",
+			expectedBody:     "error parsing token\n",
 		},
 		{
 			name:             "Malformed_authorization_header:_Bearer_skk",
@@ -206,7 +242,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + "skk",
-			expectedBody:     "error parsing token\nno tenant labels found\n",
+			expectedBody:     "error parsing token\n",
 		},
 		{
 			name:             "Missing_tenant_labels_for_user",
@@ -214,7 +250,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + tokens["noTenant"],
-			expectedBody:     "no tenant labels found\n",
+			expectedBody:     "error getting label policy",
 		},
 		{
 			name:             "Valid_token_and_headers_no_query",
@@ -230,7 +266,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "user not allowed with tenant label forbidden_tenant\n",
+			expectedBody:     "unauthorized tenant_id",
 		},
 		{
 			name:             "Not_a_User_accessing_forbidden_tenant",
@@ -238,7 +274,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "no tenant labels found\n",
+			expectedBody:     "error getting label policy",
 		},
 		{
 			name:             "User_belongs_to_no_groups_accessing_forbidden_tenant",
@@ -246,7 +282,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "no tenant labels found\n",
+			expectedBody:     "error getting label policy",
 		},
 		{
 			name:             "User_belongs_to_multiple_groups_accessing_allowed_tenant",
@@ -302,7 +338,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973693000000&limit=10&query={tenant_id=\"forbidden_tenant\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method}} {{.path}} {{.url | urldecode}}`&start=1690377573693000000&step=86400000ms",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "unauthorized label forbidden_tenant\n",
+			expectedBody:     "unauthorized tenant_id",
 		},
 		//{
 		//	name:             "Email_query",
@@ -382,7 +418,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "error parsing token\nno tenant labels found\n",
+			expectedBody:     "error parsing token\n",
 		},
 		{
 			name:             "Malformed_authorization_header:_Bearer_skk",
@@ -390,7 +426,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer skk",
-			expectedBody:     "error parsing token\nno tenant labels found\n",
+			expectedBody:     "error parsing token\n",
 		},
 		{
 			name:             "Missing_tenant_labels_for_user",
@@ -398,7 +434,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer " + tokens["noTenant"],
-			expectedBody:     "no tenant labels found\n",
+			expectedBody:     "error getting label policy",
 		},
 		{
 			name:             "Valid_token_and_headers,_no_query",
@@ -414,7 +450,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "user not allowed with tenant label forbidden_tenant\n",
+			expectedBody:     "unauthorized tenant_id",
 		},
 		{
 			name:             "Not_a_User,_accessing_forbidden_tenant",
@@ -422,7 +458,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "no tenant labels found\n",
+			expectedBody:     "error getting label policy",
 		},
 		{
 			name:             "User_belongs_to_no_groups,_accessing_forbidden_tenant",
@@ -430,7 +466,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query?query=up{tenant_id=\"forbidden_tenant\"}",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "no tenant labels found\n",
+			expectedBody:     "error getting label policy",
 		},
 		{
 			name:             "User_belongs_to_multiple_groups,_accessing_allowed_tenant",
@@ -486,7 +522,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/loki/api/v1/query_range?direction=backward&end=1690463973693000000&limit=10&query={tenant_id=\"forbidden_tenant\"} |= `path` |= `label` | json | line_format `{{.message}}` | json | line_format `{{.request}}` | json | line_format `{{.method}} {{.path}} {{.url | urldecode}}`&start=1690377573693000000&step=86400000ms",
 			expectedStatus:   http.StatusForbidden,
-			expectedBody:     "unauthorized label forbidden_tenant\n",
+			expectedBody:     "unauthorized tenant_id",
 		},
 	}
 
@@ -543,4 +579,80 @@ func TestLogAndWriteError(t *testing.T) {
 	logAndWriteError(rw, http.StatusInternalServerError, nil, "test error")
 	a.Equal(http.StatusInternalServerError, rw.Code)
 	a.Equal("test error\n", rw.Body.String())
+}
+
+func TestGetLabelPolicyMerge(t *testing.T) {
+	parser := NewPolicyParser()
+	
+	store := FileLabelStore{
+		parser:      parser,
+		policyCache: make(map[string]*LabelPolicy),
+		rawData: map[string]RawLabelData{
+			"group1": {
+				"_rules": []interface{}{
+					map[string]interface{}{
+						"name":     "tenant_id",
+						"operator": "=",
+						"values":   []interface{}{"allowed_group1", "also_allowed_group1"},
+					},
+				},
+			},
+			"group2": {
+				"_rules": []interface{}{
+					map[string]interface{}{
+						"name":     "tenant_id",
+						"operator": "=",
+						"values":   []interface{}{"allowed_group2", "also_allowed_group2"},
+					},
+				},
+			},
+		},
+	}
+	
+	// Simulate user with multiple groups
+	identity := UserIdentity{
+		Username: "not-a-user",
+		Groups:   []string{"group1", "group2"},
+	}
+	
+	policy, err := store.GetLabelPolicy(identity, "tenant_id")
+	if err != nil {
+		t.Fatalf("Error getting policy: %v", err)
+	}
+	
+	t.Logf("Merged Policy: Logic=%s", policy.Logic)
+	t.Logf("Rules count: %d", len(policy.Rules))
+	for i, rule := range policy.Rules {
+		t.Logf("Rule %d: Name=%s, Operator=%s, Values=%v", i, rule.Name, rule.Operator, rule.Values)
+	}
+	
+	// Verify logic is OR
+	if policy.Logic != LogicOR {
+		t.Errorf("Expected Logic=OR, got %s", policy.Logic)
+	}
+	
+	// Verify we have 2 rules
+	if len(policy.Rules) != 2 {
+		t.Errorf("Expected 2 rules, got %d", len(policy.Rules))
+	}
+	
+	// Build allowed values map
+	allowedValues := make(map[string]bool)
+	for _, rule := range policy.Rules {
+		if rule.Name == "tenant_id" {
+			for _, v := range rule.Values {
+				allowedValues[v] = true
+			}
+		}
+	}
+	
+	t.Logf("Allowed values: %v", allowedValues)
+	
+	// Verify all 4 values are allowed
+	expectedValues := []string{"allowed_group1", "also_allowed_group1", "allowed_group2", "also_allowed_group2"}
+	for _, v := range expectedValues {
+		if !allowedValues[v] {
+			t.Errorf("Expected %s to be allowed", v)
+		}
+	}
 }

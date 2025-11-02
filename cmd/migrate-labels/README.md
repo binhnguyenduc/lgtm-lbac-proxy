@@ -1,5 +1,9 @@
 # Label Migration Tool
 
+⚠️ **URGENT: Required Migration for v0.12.0+**
+
+Starting with v0.12.0, the simple label format has been completely removed. All users **must** migrate to the extended format before upgrading. This tool helps you convert your existing labels.yaml file to the required format.
+
 A CLI tool to migrate label configuration files from simple format to extended multi-label format.
 
 ## Features
@@ -124,6 +128,18 @@ Skipped:           1
 | `-default-label` | Default label name for conversion | `namespace` |
 | `-dry-run` | Preview conversion without writing | `false` |
 | `-validate` | Validate and analyze only | `false` |
+
+## Pre-Upgrade Check
+
+Before upgrading to v0.12.0+, verify if your labels.yaml needs migration:
+
+```bash
+./migrate-labels -input configs/labels.yaml -validate
+```
+
+**If the output shows "Simple format: 0"**, you're already using extended format and can upgrade safely.
+
+**If the output shows any simple format entries**, you must complete the migration workflow below before upgrading.
 
 ## Migration Workflow
 

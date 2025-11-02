@@ -228,38 +228,22 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 			logAndWriteError(w, http.StatusForbidden, err, "")
 		}
 
-		// Try new policy-based enforcement first
+		// Policy-based enforcement (only method supported)
 		policy, skip, err := validateLabelPolicy(oauthToken, tl, a)
 		if err != nil {
-			// Fall back to legacy enforcement if policy retrieval fails
-			log.Debug().Err(err).Msg("Policy-based enforcement failed, falling back to legacy mode")
-			labels, skip, err := validateLabels(oauthToken, a)
-			if err != nil {
-				logAndWriteError(w, http.StatusForbidden, err, "")
-				return
-			}
-			if skip {
-				streamUp(w, r, upstreamURL, tls, headers, a)
-				return
-			}
+			logAndWriteError(w, http.StatusForbidden, err, "")
+			return
+		}
 
-			err = enforceRequest(r, enforcer, labels, tl, matchWord)
-			if err != nil {
-				logAndWriteError(w, http.StatusForbidden, err, "")
-				return
-			}
-		} else {
-			// Use policy-based enforcement
-			if skip {
-				streamUp(w, r, upstreamURL, tls, headers, a)
-				return
-			}
+		if skip {
+			streamUp(w, r, upstreamURL, tls, headers, a)
+			return
+		}
 
-			err = enforceRequestWithPolicy(r, enforcer, policy, matchWord)
-			if err != nil {
-				logAndWriteError(w, http.StatusForbidden, err, "")
-				return
-			}
+		err = enforceRequest(r, enforcer, policy, matchWord)
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "")
+			return
 		}
 
 		if _, ok := enforcer.(LogQLEnforcer); ok {

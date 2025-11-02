@@ -1,6 +1,140 @@
 # Upgrade Guide
 
-## Upgrading to Multi-Label Enforcement
+## 🚨 Upgrading to v0.12.0 (Breaking Change)
+
+**IMPORTANT**: Version 0.12.0 removes support for the simple label format. You **MUST** migrate to the extended format before upgrading.
+
+### Prerequisites
+
+Before upgrading to v0.12.0:
+
+1. **Backup your labels ConfigMap**:
+   ```bash
+   kubectl get configmap lgtm-lbac-proxy-labels -n monitoring -o yaml > labels-backup.yaml
+   ```
+
+2. **Check current format** - If your `labels.yaml` looks like this, you MUST migrate:
+   ```yaml
+   # ❌ Simple format (NO LONGER SUPPORTED in v0.12.0)
+   user1:
+     namespace1: true
+     namespace2: true
+   ```
+
+3. **Target format** - All labels must use extended format:
+   ```yaml
+   # ✅ Extended format (REQUIRED in v0.12.0+)
+   user1:
+     _rules:
+       - name: namespace
+         operator: "="
+         values: ["namespace1", "namespace2"]
+     _logic: AND
+   ```
+
+### Migration Steps
+
+#### Step 1: Download Migration Tool
+
+```bash
+wget https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/latest/download/migrate-labels
+chmod +x migrate-labels
+```
+
+#### Step 2: Export Current Labels
+
+```bash
+# Export from ConfigMap
+kubectl get configmap lgtm-lbac-proxy-labels -n monitoring \
+  -o jsonpath='{.data.labels\.yaml}' > labels-current.yaml
+```
+
+#### Step 3: Convert to Extended Format
+
+```bash
+# Preview conversion (dry-run)
+./migrate-labels -input labels-current.yaml -dry-run -tenant-label namespace
+
+# Convert to extended format
+./migrate-labels -input labels-current.yaml \
+  -output labels-extended.yaml \
+  -tenant-label namespace
+
+# Verify the output
+cat labels-extended.yaml
+```
+
+#### Step 4: Test in Non-Production
+
+Deploy the new format to a test environment first:
+
+```bash
+# Create test ConfigMap
+kubectl create configmap lgtm-lbac-proxy-labels-test \
+  --from-file=labels.yaml=./labels-extended.yaml \
+  --namespace monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Test queries
+curl -H "Authorization: Bearer $TOKEN" \
+  http://proxy:8080/api/v1/query?query=up
+```
+
+#### Step 5: Deploy to Production
+
+```bash
+# Update production ConfigMap
+kubectl create configmap lgtm-lbac-proxy-labels \
+  --from-file=labels.yaml=./labels-extended.yaml \
+  --namespace monitoring \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Restart proxy to reload labels
+kubectl rollout restart deployment/lgtm-lbac-proxy -n monitoring
+```
+
+#### Step 6: Upgrade Helm Release
+
+```bash
+helm upgrade lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  --namespace monitoring \
+  --values your-values.yaml \
+  --version 0.12.0
+```
+
+### Rollback Procedure
+
+If you encounter issues after upgrading:
+
+```bash
+# 1. Restore original labels ConfigMap
+kubectl apply -f labels-backup.yaml
+
+# 2. Downgrade to previous version
+helm rollback lgtm-lbac-proxy -n monitoring
+
+# 3. Restart pods
+kubectl rollout restart deployment/lgtm-lbac-proxy -n monitoring
+```
+
+### Troubleshooting
+
+**Error: "invalid label format" or "missing _rules key"**
+- Check that all users have `_rules` and `_logic` keys
+- Validate YAML syntax with: `./migrate-labels -input labels.yaml -validate`
+
+**Error: Queries return 403 after upgrade**
+- Verify label names are correct (case-sensitive)
+- Check operator syntax uses quotes: `operator: "="`
+- Ensure values are arrays: `values: ["namespace1", "namespace2"]`
+
+**Need help?**
+- See [Migration Guide](../../README.md#migration-from-simple-format-v011-and-earlier)
+- Open issue: https://github.com/binhnguyenduc/lgtm-lbac-proxy/issues
+
+---
+
+## Upgrading to Multi-Label Enforcement (v0.10.0)
 
 Starting from version 0.10.0, the proxy supports flexible multi-label enforcement with both simple and extended label formats.
 

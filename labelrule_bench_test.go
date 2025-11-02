@@ -5,18 +5,6 @@ import (
 )
 
 // Benchmark policy parsing performance
-func BenchmarkPolicyParser_SimpleFormat(b *testing.B) {
-	parser := NewPolicyParser()
-	data := RawLabelData{
-		"namespace": "prod",
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = parser.ParseUserPolicy(data, "namespace")
-	}
-}
-
 func BenchmarkPolicyParser_ExtendedFormat(b *testing.B) {
 	parser := NewPolicyParser()
 	data := RawLabelData{
@@ -41,37 +29,7 @@ func BenchmarkPolicyParser_ExtendedFormat(b *testing.B) {
 	}
 }
 
-func BenchmarkPolicyParser_MixedFormat(b *testing.B) {
-	parser := NewPolicyParser()
-	data := RawLabelData{
-		"namespace": "dev",
-		"_rules": []interface{}{
-			map[string]interface{}{
-				"name":     "environment",
-				"operator": "!=",
-				"values":   []interface{}{"production"},
-			},
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = parser.ParseUserPolicy(data, "namespace")
-	}
-}
-
 // Benchmark PromQL enforcement
-func BenchmarkPromQLEnforcer_SingleLabel(b *testing.B) {
-	enforcer := PromQLEnforcer{}
-	query := `rate(http_requests_total[5m])`
-	labels := map[string]bool{"prod": true}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.Enforce(query, labels, "namespace")
-	}
-}
-
 func BenchmarkPromQLEnforcer_MultiLabel(b *testing.B) {
 	enforcer := PromQLEnforcer{}
 	query := `rate(http_requests_total[5m])`
@@ -93,22 +51,11 @@ func BenchmarkPromQLEnforcer_MultiLabel(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.EnforceMulti(query, policy)
+		_, _ = enforcer.Enforce(query, policy)
 	}
 }
 
 // Benchmark LogQL enforcement
-func BenchmarkLogQLEnforcer_SingleLabel(b *testing.B) {
-	enforcer := LogQLEnforcer{}
-	query := `{job="app"} |= "error"`
-	labels := map[string]bool{"prod": true}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.Enforce(query, labels, "namespace")
-	}
-}
-
 func BenchmarkLogQLEnforcer_MultiLabel(b *testing.B) {
 	enforcer := LogQLEnforcer{}
 	query := `{job="app"} |= "error"`
@@ -130,22 +77,11 @@ func BenchmarkLogQLEnforcer_MultiLabel(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.EnforceMulti(query, policy)
+		_, _ = enforcer.Enforce(query, policy)
 	}
 }
 
 // Benchmark TraceQL enforcement
-func BenchmarkTraceQLEnforcer_SingleLabel(b *testing.B) {
-	enforcer := TraceQLEnforcer{}
-	query := `{ span.http.status_code = 500 }`
-	labels := map[string]bool{"prod": true}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.Enforce(query, labels, "resource.namespace")
-	}
-}
-
 func BenchmarkTraceQLEnforcer_MultiLabel(b *testing.B) {
 	enforcer := TraceQLEnforcer{}
 	query := `{ span.http.status_code = 500 }`
@@ -167,7 +103,7 @@ func BenchmarkTraceQLEnforcer_MultiLabel(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.EnforceMulti(query, policy)
+		_, _ = enforcer.Enforce(query, policy)
 	}
 }
 
@@ -240,7 +176,7 @@ func BenchmarkPromQLEnforcer_ComplexQuery(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = enforcer.EnforceMulti(query, policy)
+		_, _ = enforcer.Enforce(query, policy)
 	}
 }
 

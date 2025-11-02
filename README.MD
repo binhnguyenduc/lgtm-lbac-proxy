@@ -182,26 +182,58 @@ tempo:
 
 ### Label Configuration
 
-Create `labels.yaml` (ConfigMap mode):
+Create `labels.yaml` using the extended multi-label format:
 
 ```yaml
-# User-specific labels
+# User-specific labels with multi-label policies
 alice@example.com:
-  prod: true
-  staging: true
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['prod', 'staging']
+  _logic: AND
 
 bob@example.com:
-  dev: true
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['dev']
+  _logic: AND
 
 # Group-based labels
 engineering-team:
-  prod: true
-  staging: true
-  dev: true
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['prod', 'staging', 'dev']
+  _logic: AND
 
-# Admin access
+# Admin access (cluster-wide bypass)
 cluster-admins:
-  "#cluster-wide": true
+  _rules:
+    - name: '#cluster-wide'
+      operator: '='
+      values: ['true']
+  _logic: AND
+```
+
+**Extended Format Features:**
+- **Multi-label support**: Enforce multiple labels simultaneously (e.g., namespace AND team)
+- **Operators**: `=` (exact), `!=` (not equal), `=~` (regex), `!~` (negative regex)
+- **Logic**: `AND` (all rules must match) or `OR` (any rule can match)
+
+**Example - Multi-label Policy:**
+```yaml
+# Enforce both namespace and team labels
+user@example.com:
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['prod']
+    - name: team
+      operator: '=~'
+      values: ['backend.*']
+  _logic: AND  # Both conditions must be satisfied
 ```
 
 ### Migration from MySQL Label Store
@@ -214,16 +246,24 @@ If you're upgrading from a version that used MySQL label store:
 SELECT username, allowed_labels FROM label_mappings;
 ```
 
-**Step 2: Convert to YAML format**
+**Step 2: Convert to extended format**
 
-Create `labels.yaml`:
+Create `labels.yaml` using the extended multi-label format:
 ```yaml
-# Convert MySQL rows to YAML format
+# Convert MySQL rows to extended format
 username1:
-  namespace1: true
-  namespace2: true
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['namespace1', 'namespace2']
+  _logic: AND
+
 group1:
-  namespace3: true
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['namespace3']
+  _logic: AND
 ```
 
 **Step 3: Update configuration**
@@ -239,6 +279,69 @@ kubectl create configmap lgtm-lbac-proxy-labels \
 ```
 
 **Note**: The label store now automatically uses file-based ConfigMap mode. For custom label store implementations (e.g., external databases, LDAP), see the `contrib/labelstores/` directory.
+
+### Migration from Simple Format (v0.11 and earlier)
+
+**BREAKING CHANGE in v0.12.0**: The simple label format has been removed. If you're upgrading from v0.11 or earlier, you must migrate to the extended format.
+
+**Old Simple Format (DEPRECATED, removed in v0.12.0):**
+```yaml
+# ❌ This format is no longer supported
+user@example.com:
+  namespace1: true
+  namespace2: true
+```
+
+**New Extended Format (REQUIRED as of v0.12.0):**
+```yaml
+# ✅ Use this format
+user@example.com:
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['namespace1', 'namespace2']
+  _logic: AND
+```
+
+**Migration Tool:**
+
+A migration tool is provided to automatically convert simple format to extended format:
+
+```bash
+# Download the migration tool
+wget https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/latest/download/migrate-labels
+
+# Make it executable
+chmod +x migrate-labels
+
+# Convert your labels file
+./migrate-labels -input labels.yaml -output labels-extended.yaml -tenant-label namespace
+
+# Verify the output
+cat labels-extended.yaml
+
+# Deploy the new format
+kubectl create configmap lgtm-lbac-proxy-labels \
+  --from-file=labels.yaml=./labels-extended.yaml \
+  --namespace observability \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+**Migration Steps:**
+
+1. **Backup**: Save your current `labels.yaml`
+2. **Convert**: Use the migration tool to convert to extended format
+3. **Test**: Validate the new format works in a test environment
+4. **Deploy**: Update your ConfigMap with the new format
+5. **Upgrade**: Deploy v0.12.0+ with the extended format
+
+**Why This Change?**
+
+The extended format provides:
+- **Multi-label enforcement**: Support for complex policies (namespace AND team)
+- **Flexible operators**: Exact match, regex, negation
+- **Logical combinations**: AND/OR logic for rules
+- **Future-proof**: Foundation for advanced RBAC features
 
 ---
 
@@ -321,10 +424,17 @@ metadata:
 data:
   labels.yaml: |
     alice@example.com:
-      prod: true
-      staging: true
+      _rules:
+        - name: namespace
+          operator: '='
+          values: ['prod', 'staging']
+      _logic: AND
     admin-group:
-      '#cluster-wide': true
+      _rules:
+        - name: '#cluster-wide'
+          operator: '='
+          values: ['true']
+      _logic: AND
 EOF
 ```
 

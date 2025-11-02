@@ -100,26 +100,3 @@ func (p *LabelPolicy) HasClusterWideAccess() bool {
 	}
 	return false
 }
-
-// ToSimpleLabels converts a LabelPolicy to the legacy map[string]bool format.
-// This is used for backward compatibility with existing code that expects simple labels.
-// Only works for policies with single-value equality rules.
-func (p *LabelPolicy) ToSimpleLabels() (map[string]bool, bool) {
-	labels := make(map[string]bool)
-
-	for _, rule := range p.Rules {
-		// Check for cluster-wide access
-		if rule.Name == "#cluster-wide" {
-			return nil, true
-		}
-
-		// Only convert simple equality rules with single values
-		if rule.Operator == OperatorEquals && len(rule.Values) == 1 {
-			labels[rule.Values[0]] = true
-		}
-		// For other operators or multiple values, we cannot convert to simple format
-		// The caller should use EnforceMulti instead
-	}
-
-	return labels, false
-}

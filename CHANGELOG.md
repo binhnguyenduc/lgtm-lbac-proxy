@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - TBD
+
+This release removes the deprecated simple label format, making the extended multi-label format the only supported configuration format. This is a **breaking change** that requires users to migrate their `labels.yaml` configuration before upgrading.
+
+### 🚨 BREAKING CHANGES
+
+- **Simple Label Format Removed**: The simple format (`user: {namespace: true}`) is no longer supported
+  - All users must migrate to extended format with `_rules` and `_logic` keys
+  - Migration tool available: `cmd/migrate-labels/migrate-labels`
+  - See [Migration Guide](README.md#migration-from-simple-format-v011-and-earlier) for detailed instructions
+
+### Removed
+
+- **Labelstore Interface**: Removed `GetLabels()` method (use `GetLabelPolicy()` only)
+- **Authentication**: Removed `validateLabels()` function (use `validateLabelPolicy()` only)
+- **Policy Parser**: Removed simple format parsing and auto-conversion logic
+  - Removed `parseSimpleFormat()` method
+  - Removed `simpleEntryToRule()` conversion method
+  - Removed `IsExtendedFormat()` detection function
+- **Label Policy**: Removed `ToSimpleLabels()` backward compatibility method
+- **Query Enforcers**: Removed dual-method pattern
+  - Removed separate `Enforce()` for simple format (now handles all policies)
+  - Renamed `EnforceMulti()` to `Enforce()` for unified interface
+- **Label Store**: Removed simple format caching and conversion logic
+  - Removed `labels` field from `FileLabelStore`
+  - Removed `useExtended` flag
+  - Removed backward compatibility in `mergePolicies()`
+
+### Changed
+
+- **Unified Enforcement**: All query enforcers now use single `Enforce()` method for multi-label policies
+- **Simplified Interface**: Labelstore now has single method: `GetLabelPolicy()`
+- **Cleaner Architecture**: Removed format detection, conversion, and dual-path logic
+- **Documentation**: Updated all examples to show only extended format
+
+### Fixed
+
+- **Policy Validation Bug**: Fixed validation issue with merged policies using OR logic in all enforcers
+  - PromQL, LogQL, and TraceQL enforcers now correctly validate OR-combined policies
+  - Fixed regex compilation for merged multi-value rules
+
+### Migration Required
+
+**Before Upgrading:**
+
+1. **Backup** your current `labels.yaml` configuration
+2. **Convert** using migration tool:
+   ```bash
+   ./migrate-labels -input labels.yaml -output labels-extended.yaml -tenant-label namespace
+   ```
+3. **Test** the converted configuration in a non-production environment
+4. **Deploy** the new configuration:
+   ```bash
+   kubectl create configmap lgtm-lbac-proxy-labels \
+     --from-file=labels.yaml=./labels-extended.yaml \
+     --namespace observability \
+     --dry-run=client -o yaml | kubectl apply -f -
+   ```
+5. **Upgrade** to v0.12.0
+
+**Migration Tool Download:**
+```bash
+wget https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/latest/download/migrate-labels
+chmod +x migrate-labels
+```
+
+For detailed migration instructions, see:
+- [Main README - Migration Section](README.md#migration-from-simple-format-v011-and-earlier)
+- [Helm Chart UPGRADE Guide](helm/lgtm-lbac-proxy/UPGRADE.md)
+
+### Performance
+
+No performance degradation. Slight improvement due to removal of format detection overhead:
+- Extended format parsing: ~1.9 µs/op (unchanged)
+- PromQL enforcement: ~5-25 µs/op (unchanged)
+- Memory usage: Reduced by ~5-10% (removed dual format caching)
+
 ## [0.10.0] - 2025-11-02
 
 This release introduces **flexible multi-label enforcement**, enabling fine-grained access control with multiple label rules per user/group. Users can now define complex authorization policies with different label names, operators, and logic combinations while maintaining full backward compatibility with existing single-label configurations.

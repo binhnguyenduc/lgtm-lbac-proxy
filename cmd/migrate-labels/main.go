@@ -68,6 +68,16 @@ func main() {
 	if *validate {
 		stats := analyzeFile(data)
 		printStats(stats)
+
+		// Exit with error code if simple format detected
+		if stats.SimpleEntries > 0 {
+			fmt.Printf("\n⚠️  WARNING: %d entries in simple format detected!\n", stats.SimpleEntries)
+			fmt.Println("📋 Action required: Run migration before upgrading to v0.12.0+")
+			fmt.Println("   Example: ./migrate-labels -input", *input)
+			os.Exit(1)
+		}
+
+		fmt.Println("\n✅ All entries are in extended format. Safe to upgrade to v0.12.0+")
 		return
 	}
 

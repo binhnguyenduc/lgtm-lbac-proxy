@@ -6,16 +6,16 @@ proxy:
     group: gepardec-run-admins # group name for admin bypass
   thanos:
     url: https://thanos-querier.monitoring.svc.cluster.local:9091
-    tenantLabel: namespace  # Default label name for simple format; used as fallback
+    tenantLabel: namespace  # Default label name (used in extended format _rules)
   loki:
     url: https://loki-query-frontend-http.logging.svc.cluster.local:3100
-    tenantLabel: kubernetes_namespace_name  # Default label name for simple format; used as fallback
+    tenantLabel: kubernetes_namespace_name  # Default label name (used in extended format _rules)
     actorHeader: X-Loki-Actor-Path
     headers:
       X-Scope-OrgID: application
   tempo:
     url: https://tempo-query-frontend.tracing.svc.cluster.local:3200
-    tenantLabel: resource.namespace  # Default label name for simple format; used as fallback
+    tenantLabel: resource.namespace  # Default label name (used in extended format _rules)
     actorHeader: ""
     headers: {}
   alert:
@@ -31,16 +31,11 @@ proxy:
     configPaths: # paths to search for label configuration files
       - /etc/config/labels/ # Kubernetes ConfigMap mount path
       - ./configs # Local development path
-    # Label Store Format:
-    # The label store supports both simple and extended formats.
+    # Label Store Format (v0.12.0+):
+    # ONLY extended format is supported. Simple format was removed in v0.12.0.
     #
-    # Simple Format (backward compatible):
+    # Extended Format - Multi-label policies with operators:
     #   user1:
-    #     namespace1: true
-    #     namespace2: true
-    #
-    # Extended Format (multi-label with operators):
-    #   user2:
     #     _rules:
     #       - name: namespace
     #         operator: "="
@@ -50,9 +45,20 @@ proxy:
     #         values: ["backend.*"]
     #     _logic: AND  # Combine rules with AND or OR
     #
-    # Supported operators: "=", "!=", "=~", "!~"
-    # tenant_label fields above serve as default label name for simple format
-    # See migration tool: ./migrate-labels for bulk conversion
+    #   # Admin with cluster-wide access
+    #   admin-group:
+    #     _rules:
+    #       - name: '#cluster-wide'
+    #         operator: "="
+    #         values: ["true"]
+    #     _logic: AND
+    #
+    # Supported operators: "=" (equals), "!=" (not equals), "=~" (regex), "!~" (negative regex)
+    # Supported logic: AND (default), OR
+    #
+    # Migration from simple format:
+    # Use the migration tool (./cmd/migrate-labels) to convert old format to extended format.
+    # See UPGRADE.md for detailed migration instructions.
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65534

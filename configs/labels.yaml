@@ -1,8 +1,26 @@
+# Extended Format - Multi-label policies with operators
+# This is the only supported format as of v0.12.0
+
+# Admin group with cluster-wide access
 group1:
-  '#cluster-wide': true # this grants the group to skip enforcement
+  _rules:
+    - name: '#cluster-wide'
+      operator: '='
+      values: ['true']
+  _logic: AND
+
+# User with single namespace access
 user1:
-  hogarama: true # single namespace
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['hogarama']
+  _logic: AND
+
+# User with multiple namespace access
 user3:
-  grafana: true # multi namespace
-  opernshift-logging: true
-  opernshift-monitoring: true
+  _rules:
+    - name: namespace
+      operator: '='
+      values: ['grafana', 'opernshift-logging', 'opernshift-monitoring']
+  _logic: AND
