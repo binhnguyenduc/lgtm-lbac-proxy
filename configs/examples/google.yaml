@@ -1,0 +1,48 @@
+# Google OAuth Provider Configuration Example
+# Google uses standard OpenID Connect claims with some Google-specific fields
+
+log:
+  level: 1
+
+auth:
+  jwks_cert_url: https://www.googleapis.com/oauth2/v3/certs
+  auth_header: "Authorization"
+  claims:
+    username: "email"                # Google: Use email as username (or 'sub' for opaque ID)
+    email: "email"                   # Standard email claim
+    groups: "hd"                     # Google: 'hd' (hosted domain) for G Suite org identification
+
+admin:
+  bypass: true
+  group: "example.com"               # G Suite domain for admins
+
+thanos:
+  url: "https://thanos-querier:9091"
+  tenant_label: "namespace"
+
+loki:
+  url: "https://loki-query-frontend:3100"
+  tenant_label: "kubernetes_namespace_name"
+
+tempo:
+  url: "https://tempo-query-frontend:3200"
+  tenant_label: "resource.namespace"
+
+labelstore:
+  config_paths:
+    - /etc/config/labels/
+    - ./configs
+
+# Note: Google OAuth tokens include:
+# - sub: Unique user identifier (opaque string)
+# - email: User's email address
+# - email_verified: Boolean indicating email verification
+# - hd: Hosted domain (only for G Suite users)
+# - name: Full name
+# - given_name: First name
+# - family_name: Last name
+#
+# For group-based authorization, you'll need to:
+# 1. Use G Suite Admin SDK to fetch user groups
+# 2. Add groups to tokens via a custom authorization server
+# 3. Or use the 'hd' claim to identify organizational membership

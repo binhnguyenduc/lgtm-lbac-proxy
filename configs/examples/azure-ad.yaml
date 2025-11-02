@@ -1,0 +1,40 @@
+# Azure AD (Entra ID) OAuth Provider Configuration Example
+# Azure AD uses different claim names for user identity
+
+log:
+  level: 1
+
+auth:
+  jwks_cert_url: https://login.microsoftonline.com/{tenant-id}/discovery/v2.0/keys
+  auth_header: "Authorization"
+  claims:
+    username: "unique_name"          # Azure AD: unique_name or upn (User Principal Name)
+    email: "upn"                     # Azure AD: upn or email
+    groups: "roles"                  # Azure AD: roles or groups (requires app manifest config)
+
+admin:
+  bypass: true
+  group: "cluster-admins"
+
+thanos:
+  url: "https://thanos-querier:9091"
+  tenant_label: "namespace"
+
+loki:
+  url: "https://loki-query-frontend:3100"
+  tenant_label: "kubernetes_namespace_name"
+
+tempo:
+  url: "https://tempo-query-frontend:3200"
+  tenant_label: "resource.namespace"
+
+labelstore:
+  config_paths:
+    - /etc/config/labels/
+    - ./configs
+
+# Note: To include group/role claims in Azure AD tokens, you need to:
+# 1. Register your application in Azure Portal
+# 2. Configure App Roles or Group Claims in the app manifest
+# 3. Assign users/groups to the app roles
+# 4. Ensure the token includes the roles/groups claim

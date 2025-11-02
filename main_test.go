@@ -30,19 +30,34 @@ func genJWKS(username, email string, groups []string, pk *ecdsa.PrivateKey) (str
 	return token.SignedString(pk)
 }
 
+// genJWKSWithCustomClaims generates a JWT token with custom claim names
+func genJWKSWithCustomClaims(claims map[string]interface{}, pk *ecdsa.PrivateKey) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims(claims))
+	token.Header["kid"] = "testKid"
+	return token.SignedString(pk)
+}
+
+// setupTestMainWithPrivateKey returns app, tokens, and private key for custom claim testing
+// setupTestMain initializes test environment without returning the private key
 func setupTestMain() (App, map[string]string) {
+	app, tokens, _ := setupTestMainWithPrivateKey()
+	return app, tokens
+}
+
+// setupTestMainWithPrivateKey initializes test environment and returns the private key for custom claims testing
+func setupTestMainWithPrivateKey() (App, map[string]string, *ecdsa.PrivateKey) {
 	// Generate a new private key.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		fmt.Printf("Failed to generate private key: %s\n", err)
-		return App{}, nil
+		return App{}, nil, nil
 	}
 
 	// Encode the private key to PEM format.
 	privateKeyBytes, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		fmt.Printf("Failed to marshal private key: %s\n", err)
-		return App{}, nil
+		return App{}, nil, nil
 	}
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "EC PRIVATE KEY",
@@ -53,7 +68,7 @@ func setupTestMain() (App, map[string]string) {
 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
 		fmt.Printf("Failed to marshal public key: %s\n", err)
-		return App{}, nil
+		return App{}, nil, nil
 	}
 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "PUBLIC KEY",
@@ -206,7 +221,7 @@ func setupTestMain() (App, map[string]string) {
 		InsecureSkipVerify: true,
 	}
 	app.WithProxies()
-	return app, tokens
+	return app, tokens, pk
 }
 
 func Test_reverseProxy(t *testing.T) {

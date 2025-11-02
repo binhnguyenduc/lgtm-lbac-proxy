@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2025-11-02
+
+This release introduces **configurable JWT claims** and **dedicated auth configuration** for enhanced OAuth provider compatibility and cleaner configuration structure.
+
+### Added
+
+- **Configurable JWT Claims**: Full configurability for JWT claim field names
+  - `auth.claims.username`: Configure which JWT claim to use for username (default: `preferred_username`)
+  - `auth.claims.email`: Configure which JWT claim to use for email (default: `email`)
+  - `auth.claims.groups`: Configure which JWT claim to use for groups (default: `groups`)
+  - Supports different OAuth providers: Keycloak, Azure AD, Auth0, Google, Okta
+  - See `configs/examples/` for provider-specific configuration examples
+
+- **Dedicated Auth Configuration Section**: Separation of concerns for authentication
+  - New `auth` configuration section for all authentication-related settings
+  - Includes `jwks_cert_url`, `auth_header`, and `claims` sub-section
+  - Cleaner configuration structure following best practices
+
+- **OAuth Provider Examples**: Ready-to-use configuration examples
+  - `configs/examples/keycloak.yaml`: Standard OpenID Connect claims
+  - `configs/examples/azure-ad.yaml`: Azure AD-specific claims (unique_name, upn, roles)
+  - `configs/examples/auth0.yaml`: Auth0 with namespaced claims
+  - `configs/examples/google.yaml`: Google OAuth with domain-based groups
+  - `configs/examples/README.md`: Comprehensive guide with claim mappings and troubleshooting
+
+- **Helm Chart Support**: Full Helm chart integration for new auth configuration
+  - New `proxy.auth` values section with backward compatibility
+  - Automatic migration from legacy `proxy.web` auth fields
+  - Provider examples in values comments
+
+### Changed
+
+- **Configuration Structure**: Auth settings moved from `web` to dedicated `auth` section
+  - DEPRECATED: `web.jwks_cert_url` → use `auth.jwks_cert_url`
+  - DEPRECATED: `web.oauth_group_name` → use `auth.claims.groups`
+  - Legacy fields still supported with deprecation warnings for backward compatibility
+
+### Documentation
+
+- Updated README with configurable JWT claims section and provider comparison table
+- Updated CLAUDE.md with OAuth provider configuration details
+- Updated Helm chart values.yaml with new auth configuration and examples
+- Added comprehensive OAuth provider examples in `configs/examples/`
+
+### Migration
+
+**Backward Compatibility**: Existing configurations continue to work without changes. The proxy automatically migrates legacy `web` auth fields to the new `auth` structure with deprecation warnings logged.
+
+**Recommended Migration**:
+```yaml
+# Old format (still supported, deprecated)
+web:
+  jwks_cert_url: "https://oauth.example.com/certs"
+  oauth_group_name: "groups"
+
+# New format (recommended)
+auth:
+  jwks_cert_url: "https://oauth.example.com/certs"
+  claims:
+    username: "preferred_username"
+    email: "email"
+    groups: "groups"
+```
+
 ## [0.13.0] - 2025-11-02
 
 This release introduces **high-performance proxy optimization** with configurable HTTP transport settings, connection pooling, and per-upstream configuration. These improvements enable handling 1000-2000+ req/s throughput with minimal latency overhead while maintaining full backward compatibility.

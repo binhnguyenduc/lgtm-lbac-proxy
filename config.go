@@ -21,16 +21,37 @@ type LogConfig struct {
 	LogTokens bool `mapstructure:"log_tokens"`
 }
 
+// ClaimsConfig defines the JWT claim field names to extract from tokens.
+// Different OAuth providers use different claim names for standard fields.
+type ClaimsConfig struct {
+	Username string `mapstructure:"username"` // Claim name for username (e.g., "preferred_username", "sub", "unique_name")
+	Email    string `mapstructure:"email"`    // Claim name for email (e.g., "email", "upn", "mail")
+	Groups   string `mapstructure:"groups"`   // Claim name for groups (e.g., "groups", "roles", "https://example.com/groups")
+}
+
+// AuthConfig contains all authentication-related configuration.
+// This separates auth concerns from web server configuration.
+type AuthConfig struct {
+	JwksCertURL string       `mapstructure:"jwks_cert_url"` // JWKS endpoint URL for token validation
+	AuthHeader  string       `mapstructure:"auth_header"`   // HTTP header containing the JWT token
+	Claims      ClaimsConfig `mapstructure:"claims"`        // JWT claim field names
+}
+
 type WebConfig struct {
 	ProxyPort           int    `mapstructure:"proxy_port"`
 	MetricsPort         int    `mapstructure:"metrics_port"`
 	Host                string `mapstructure:"host"`
 	TLSVerifySkip       bool   `mapstructure:"tls_verify_skip"`
 	TrustedRootCaPath   string `mapstructure:"trusted_root_ca_path"`
-	JwksCertURL         string `mapstructure:"jwks_cert_url"`
-	OAuthGroupName      string `mapstructure:"oauth_group_name"`
 	ServiceAccountToken string `mapstructure:"service_account_token"`
-	AuthHeader          string `mapstructure:"auth_header"`
+
+	// DEPRECATED: These fields are deprecated in favor of AuthConfig.
+	// They are kept for backward compatibility and will be removed in a future version.
+	JwksCertURL        string `mapstructure:"jwks_cert_url"`
+	OAuthUsernameClaim string `mapstructure:"oauth_username_claim"`
+	OAuthEmailClaim    string `mapstructure:"oauth_email_claim"`
+	OAuthGroupName     string `mapstructure:"oauth_group_name"`
+	AuthHeader         string `mapstructure:"auth_header"`
 }
 
 type AdminConfig struct {
@@ -96,6 +117,7 @@ type TempoConfig struct {
 
 type Config struct {
 	Log        LogConfig        `mapstructure:"log"`
+	Auth       AuthConfig       `mapstructure:"auth"` // Authentication configuration (preferred)
 	Web        WebConfig        `mapstructure:"web"`
 	Admin      AdminConfig      `mapstructure:"admin"`
 	Alert      AlertConfig      `mapstructure:"alert"`
@@ -140,10 +162,9 @@ func (a *App) WithConfig() *App {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error while unmarshalling config file")
 	}
-	// Set default auth header if not configured
-	if a.Cfg.Web.AuthHeader == "" {
-		a.Cfg.Web.AuthHeader = "Authorization"
-	}
+
+	// Migrate legacy configuration to new auth section with backward compatibility
+	a.migrateAuthConfig()
 	// Set default label store config paths if not configured
 	if len(a.Cfg.LabelStore.ConfigPaths) == 0 {
 		a.Cfg.LabelStore.ConfigPaths = []string{"/etc/config/labels/", "./configs"}
@@ -157,10 +178,8 @@ func (a *App) WithConfig() *App {
 			log.Error().Err(err).Msg("Error while unmarshalling config file")
 			a.healthy = false
 		}
-		// Set default auth header if not configured
-		if a.Cfg.Web.AuthHeader == "" {
-			a.Cfg.Web.AuthHeader = "Authorization"
-		}
+		// Migrate legacy configuration to new auth section
+		a.migrateAuthConfig()
 		// Set default label store config paths if not configured
 		if len(a.Cfg.LabelStore.ConfigPaths) == 0 {
 			a.Cfg.LabelStore.ConfigPaths = []string{"/etc/config/labels/", "./configs"}
@@ -280,6 +299,77 @@ func (a *App) WithJWKS() *App {
 	log.Info().Str("url", a.Cfg.Web.JwksCertURL).Msg("JWKS URL")
 	a.Jwks = jwks
 	return a
+}
+
+// migrateAuthConfig handles backward compatibility by migrating legacy web.* auth fields
+// to the new auth.* configuration structure. It supports three scenarios:
+// 1. New config only (auth section present): Use auth section, set defaults
+// 2. Legacy config only (web section with auth fields): Migrate to auth section with deprecation warning
+// 3. Mixed config (both present): Prefer auth section, log warning if web fields also present
+func (a *App) migrateAuthConfig() {
+	hasNewAuth := a.Cfg.Auth.JwksCertURL != "" || a.Cfg.Auth.AuthHeader != "" ||
+		a.Cfg.Auth.Claims.Username != "" || a.Cfg.Auth.Claims.Email != "" || a.Cfg.Auth.Claims.Groups != ""
+	hasLegacyAuth := a.Cfg.Web.JwksCertURL != "" || a.Cfg.Web.AuthHeader != "" ||
+		a.Cfg.Web.OAuthUsernameClaim != "" || a.Cfg.Web.OAuthEmailClaim != "" || a.Cfg.Web.OAuthGroupName != ""
+
+	if hasNewAuth && hasLegacyAuth {
+		// Mixed configuration: both new and legacy present
+		log.Warn().Msg("Both 'auth' and 'web' auth configuration detected. Using 'auth' section. Please remove deprecated web.jwks_cert_url, web.auth_header, web.oauth_username_claim, web.oauth_email_claim, and web.oauth_group_name fields.")
+	} else if hasLegacyAuth && !hasNewAuth {
+		// Legacy configuration: migrate to new structure
+		log.Warn().Msg("DEPRECATED: web.jwks_cert_url, web.auth_header, web.oauth_*_claim fields are deprecated. Please migrate to 'auth' section. See documentation for migration guide.")
+
+		// Migrate JWKS URL
+		if a.Cfg.Web.JwksCertURL != "" {
+			a.Cfg.Auth.JwksCertURL = a.Cfg.Web.JwksCertURL
+		}
+
+		// Migrate auth header
+		if a.Cfg.Web.AuthHeader != "" {
+			a.Cfg.Auth.AuthHeader = a.Cfg.Web.AuthHeader
+		}
+
+		// Migrate claim names
+		if a.Cfg.Web.OAuthUsernameClaim != "" {
+			a.Cfg.Auth.Claims.Username = a.Cfg.Web.OAuthUsernameClaim
+		}
+		if a.Cfg.Web.OAuthEmailClaim != "" {
+			a.Cfg.Auth.Claims.Email = a.Cfg.Web.OAuthEmailClaim
+		}
+		if a.Cfg.Web.OAuthGroupName != "" {
+			a.Cfg.Auth.Claims.Groups = a.Cfg.Web.OAuthGroupName
+		}
+	}
+
+	// Set defaults for auth configuration
+	if a.Cfg.Auth.AuthHeader == "" {
+		a.Cfg.Auth.AuthHeader = "Authorization"
+	}
+	if a.Cfg.Auth.Claims.Username == "" {
+		a.Cfg.Auth.Claims.Username = "preferred_username"
+	}
+	if a.Cfg.Auth.Claims.Email == "" {
+		a.Cfg.Auth.Claims.Email = "email"
+	}
+	if a.Cfg.Auth.Claims.Groups == "" {
+		a.Cfg.Auth.Claims.Groups = "groups"
+	}
+
+	// Also maintain backward compatibility fields for existing code that still references them
+	// This allows gradual migration of code references
+	a.Cfg.Web.JwksCertURL = a.Cfg.Auth.JwksCertURL
+	a.Cfg.Web.AuthHeader = a.Cfg.Auth.AuthHeader
+	a.Cfg.Web.OAuthUsernameClaim = a.Cfg.Auth.Claims.Username
+	a.Cfg.Web.OAuthEmailClaim = a.Cfg.Auth.Claims.Email
+	a.Cfg.Web.OAuthGroupName = a.Cfg.Auth.Claims.Groups
+
+	log.Debug().
+		Str("jwks_url", a.Cfg.Auth.JwksCertURL).
+		Str("auth_header", a.Cfg.Auth.AuthHeader).
+		Str("username_claim", a.Cfg.Auth.Claims.Username).
+		Str("email_claim", a.Cfg.Auth.Claims.Email).
+		Str("groups_claim", a.Cfg.Auth.Claims.Groups).
+		Msg("Authentication configuration loaded")
 }
 
 // validateTempoConfig validates Tempo configuration settings

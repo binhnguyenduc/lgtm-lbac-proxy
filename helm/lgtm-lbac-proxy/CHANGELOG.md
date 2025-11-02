@@ -5,6 +5,60 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2025-11-02
+
+### Added
+
+- ✨ **Configurable JWT Claims**: New `proxy.auth` section for OAuth provider flexibility
+  - `proxy.auth.claims.username`: Configurable JWT claim for username (default: `preferred_username`)
+  - `proxy.auth.claims.email`: Configurable JWT claim for email (default: `email`)
+  - `proxy.auth.claims.groups`: Configurable JWT claim for groups (default: `groups`)
+  - `proxy.auth.jwksCertUrl`: JWKS certificate URL (moved from `proxy.web`)
+  - `proxy.auth.authHeader`: Authorization header name (default: `Authorization`)
+  - Provider examples in values comments: Keycloak, Azure AD, Auth0, Google
+
+- 🔄 **Automatic Configuration Migration**: Backward compatible template logic
+  - Automatically maps legacy `proxy.web.jwksCertUrl` to `proxy.auth.jwksCertUrl`
+  - Automatically maps legacy `proxy.web.oauthGroupName` to `proxy.auth.claims.groups`
+  - Falls back to legacy fields if `proxy.auth` section is not present
+  - Zero breaking changes for existing deployments
+
+### Changed
+
+- **AppVersion**: Updated to 0.14.0 (from 0.10.0)
+- **Chart Version**: Bumped to 1.11.0 (from 1.10.0)
+- **ConfigMap Template**: Enhanced to support both new `auth` and legacy `web` configuration formats
+
+### Deprecated
+
+- `proxy.web.jwksCertUrl`: Use `proxy.auth.jwksCertUrl` instead
+- `proxy.web.oauthGroupName`: Use `proxy.auth.claims.groups` instead
+
+### Migration
+
+**Backward Compatibility**: Existing Helm values continue to work without any changes. The chart automatically generates the correct configuration format.
+
+**Recommended Values Migration**:
+```yaml
+# Old format (still supported, deprecated)
+proxy:
+  web:
+    jwksCertUrl: "https://oauth.example.com/certs"
+    oauthGroupName: "groups"
+
+# New format (recommended)
+proxy:
+  auth:
+    jwksCertUrl: "https://oauth.example.com/certs"
+    authHeader: "Authorization"
+    claims:
+      username: "preferred_username"  # Keycloak, Okta
+      # username: "unique_name"       # Azure AD
+      # username: "nickname"          # Auth0
+      email: "email"
+      groups: "groups"
+```
+
 ## [1.10.0] - 2025-11-02
 
 ### Added

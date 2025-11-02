@@ -48,9 +48,25 @@ proxy:
     tokenHeader: X-LGTM-Alert # header to use for the token
     certUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
     cert: '' # local jwks cert
-  web:
-    oauthGroupName: "groups"
+  # Authentication configuration (recommended - new in v0.14.0)
+  auth:
     jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
+    authHeader: "Authorization"
+    claims:
+      username: "preferred_username"  # JWT claim for username (default: preferred_username)
+      email: "email"                   # JWT claim for email (default: email)
+      groups: "groups"                 # JWT claim for groups (default: groups)
+    # Common OAuth Provider Examples:
+    # Keycloak: username=preferred_username, email=email, groups=groups
+    # Azure AD: username=unique_name, email=upn, groups=roles
+    # Auth0: username=nickname, email=email, groups=https://domain.com/groups
+    # Google: username=email, email=email, groups=hd
+
+  # Legacy web configuration (deprecated - use auth section above)
+  # These fields are maintained for backward compatibility but will be removed in a future release
+  web:
+    oauthGroupName: "groups"  # DEPRECATED: Use auth.claims.groups instead
+    jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs  # DEPRECATED: Use auth.jwksCertUrl instead
     tlsVerifySkip: false # skip tls verification very insecurely!!!
   labelStore:
     configPaths: # paths to search for label configuration files

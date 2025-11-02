@@ -11,14 +11,28 @@ data:
       level: {{ .Values.proxy.log.level }}
       log_tokens: false
 
+    {{- if .Values.proxy.auth }}
+    # New auth configuration (v0.14.0+)
+    auth:
+      jwks_cert_url: {{ .Values.proxy.auth.jwksCertUrl | default .Values.proxy.web.jwksCertUrl }}
+      auth_header: {{ .Values.proxy.auth.authHeader | default "Authorization" }}
+      claims:
+        username: {{ .Values.proxy.auth.claims.username | default "preferred_username" }}
+        email: {{ .Values.proxy.auth.claims.email | default "email" }}
+        groups: {{ .Values.proxy.auth.claims.groups | default .Values.proxy.web.oauthGroupName | default "groups" }}
+    {{- end }}
+
     web:
       proxy_port: {{ .Values.service.webPort }}
       metrics_port: {{ .Values.service.metricsPort }}
       host: "0.0.0.0"
       tls_verify_skip: {{ .Values.proxy.web.tlsVerifySkip}}
       trusted_root_ca_path: "/etc/secrets/ca"
+      {{- if not .Values.proxy.auth }}
+      # Legacy auth configuration (deprecated)
       jwks_cert_url: {{ .Values.proxy.web.jwksCertUrl }}
       oauth_group_name: {{ .Values.proxy.web.oauthGroupName }}
+      {{- end }}
 
     admin:
       bypass: {{ .Values.proxy.admin.bypass }}

@@ -1,0 +1,46 @@
+# Auth0 OAuth Provider Configuration Example
+# Auth0 often uses namespaced custom claims
+
+log:
+  level: 1
+
+auth:
+  jwks_cert_url: https://your-tenant.auth0.com/.well-known/jwks.json
+  auth_header: "Authorization"
+  claims:
+    username: "nickname"                           # Auth0: nickname or name
+    email: "email"                                 # Standard email claim
+    groups: "https://your-domain.com/groups"       # Auth0: Custom namespaced claim
+
+admin:
+  bypass: true
+  group: "cluster-admins"
+
+thanos:
+  url: "https://thanos-querier:9091"
+  tenant_label: "namespace"
+
+loki:
+  url: "https://loki-query-frontend:3100"
+  tenant_label: "kubernetes_namespace_name"
+
+tempo:
+  url: "https://tempo-query-frontend:3200"
+  tenant_label: "resource.namespace"
+
+labelstore:
+  config_paths:
+    - /etc/config/labels/
+    - ./configs
+
+# Note: Auth0 custom claims must be:
+# 1. Configured in Auth0 Rules or Actions
+# 2. Namespaced with a URI (e.g., https://your-domain.com/groups)
+# 3. Added to the ID token or Access token as needed
+#
+# Example Auth0 Rule to add groups claim:
+# function (user, context, callback) {
+#   const namespace = 'https://your-domain.com/';
+#   context.idToken[namespace + 'groups'] = user.groups || [];
+#   callback(null, user, context);
+# }

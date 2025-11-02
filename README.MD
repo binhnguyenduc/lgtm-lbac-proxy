@@ -155,10 +155,14 @@ See [Helm Chart Documentation](helm/lgtm-lbac-proxy/README.md) for detailed conf
 Create `config.yaml`:
 
 ```yaml
-web:
+# Authentication configuration
+auth:
   jwks_cert_url: "https://your-oauth-provider.com/certs"
-  oauth_group_name: "groups"
-  auth_header: "Authorization"  # Configurable auth header name
+  auth_header: "Authorization"
+  claims:
+    username: "preferred_username"  # JWT claim for username
+    email: "email"                   # JWT claim for email
+    groups: "groups"                 # JWT claim for groups
 
 admin:
   bypass: true
@@ -179,6 +183,38 @@ tempo:
   tenant_label: "resource.namespace"
   actor_header: "X-Tempo-User"
 ```
+
+### Configurable JWT Claims (New in v0.14.0)
+
+Different OAuth providers use different claim names for user identity. You can now configure which JWT claims to use:
+
+```yaml
+auth:
+  claims:
+    username: "preferred_username"  # Keycloak, Okta
+    # username: "unique_name"       # Azure AD
+    # username: "nickname"          # Auth0
+    # username: "email"             # Google
+
+    email: "email"                  # Most providers
+    # email: "upn"                  # Azure AD User Principal Name
+
+    groups: "groups"                # Keycloak, Okta
+    # groups: "roles"               # Azure AD
+    # groups: "https://example.com/groups"  # Auth0 (namespaced)
+```
+
+**Common OAuth Providers:**
+
+| Provider | Username | Email | Groups |
+|----------|----------|-------|--------|
+| **Keycloak** | `preferred_username` | `email` | `groups` |
+| **Azure AD** | `unique_name`, `upn` | `email`, `upn` | `roles` |
+| **Auth0** | `nickname`, `name` | `email` | `https://domain.com/groups` |
+| **Google** | `email`, `sub` | `email` | `hd` (domain) |
+| **Okta** | `preferred_username` | `email` | `groups` |
+
+See [Configuration Examples](configs/examples/README.md) for provider-specific setup guides.
 
 ### Label Configuration
 

@@ -80,23 +80,23 @@ func parseJwtToken(tokenString string, a *App) (OAuthToken, *jwt.Token, error) {
 		log.Trace().Msg("Token is invalid")
 	}
 
-	if v, ok := claimsMap["preferred_username"].(string); ok {
+	if v, ok := claimsMap[a.Cfg.Web.OAuthUsernameClaim].(string); ok {
 		oAuthToken.PreferredUsername = v
-		log.Trace().Str("preferred_username", v).Msg("PreferredUsername")
+		log.Trace().Str("claim", a.Cfg.Web.OAuthUsernameClaim).Str("value", v).Msg("Username claim")
 	}
 
-	if v, ok := claimsMap["email"].(string); ok {
+	if v, ok := claimsMap[a.Cfg.Web.OAuthEmailClaim].(string); ok {
 		if !strings.Contains(v, "@") {
-			log.Warn().Str("email", v).Msg("Email does not contain '@', therefore not an email. Could be sus")
+			log.Warn().Str("claim", a.Cfg.Web.OAuthEmailClaim).Str("value", v).Msg("Email does not contain '@', therefore not an email. Could be sus")
 		}
-		log.Trace().Str("email", v).Msg("Email")
+		log.Trace().Str("claim", a.Cfg.Web.OAuthEmailClaim).Str("value", v).Msg("Email claim")
 		oAuthToken.Email = v
 	}
 
 	if v, ok := claimsMap[a.Cfg.Web.OAuthGroupName].([]interface{}); ok {
 		for _, item := range v {
 			if s, ok := item.(string); ok {
-				log.Trace().Str("group", s).Msg("Group")
+				log.Trace().Str("claim", a.Cfg.Web.OAuthGroupName).Str("group", s).Msg("Group claim")
 				oAuthToken.Groups = append(oAuthToken.Groups, s)
 			}
 		}
