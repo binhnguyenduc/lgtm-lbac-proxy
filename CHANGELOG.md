@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2025-11-02
+
+This release simplifies the label store architecture by removing MySQL support and establishing a single, file-based implementation. This change reduces complexity, eliminates external dependencies, and provides a clearer extension pattern for community contributions.
+
+### Added
+
+- **Community Extension Pattern**: New `contrib/labelstores/` directory for community-maintained label store implementations
+  - Comprehensive documentation on implementing custom label stores
+  - Template implementation with best practices
+  - Clear interface requirements and testing guidelines
+- **Migration Guide**: Detailed instructions for migrating from MySQL to file-based label store in README.md
+
+### Removed
+
+- **MySQL Label Store**: Removed MySQLHandler implementation and all database-related code
+  - ⚠️ **BREAKING CHANGE**: MySQL label store is no longer supported
+  - Users must migrate to file-based ConfigMap label store (see migration guide in README.md)
+- **Database Dependencies**: Removed `github.com/go-sql-driver/mysql` dependency
+- **Configuration Options**:
+  - Removed `web.label_store_kind` configuration field (no longer needed)
+  - Removed entire `db:` configuration section (all MySQL-related settings)
+
+### Changed
+
+- **Label Store Logic**: Simplified `WithLabelStore()` to directly instantiate ConfigMapHandler
+  - Removed switch statement and validation logic for label_store_kind
+  - Single, straightforward initialization path
+- **Documentation**: Updated all documentation to reflect file-based label store only
+  - Updated README.md feature list
+  - Updated CLAUDE.md architecture description
+  - Updated openspec/project.md dependencies and patterns
+
+### Technical Details
+
+#### Migration Path
+Existing MySQL users should:
+1. Export labels from MySQL database
+2. Convert to YAML format
+3. Deploy as ConfigMap
+4. Remove database configuration
+5. See README.md for detailed migration steps
+
+#### Architecture Benefits
+- **Reduced Complexity**: Single label store implementation vs multiple
+- **Fewer Dependencies**: No database driver required
+- **Better Security**: No database credentials or SQL injection concerns
+- **Easier Testing**: Only file-based implementation needs testing
+- **Clearer Extension**: Community contributions via documented contrib/ pattern
+
+#### File Changes
+- `labelstore.go`: 99 deletions (MySQLHandler and related code removed)
+- `config.go`: 13 deletions (DbConfig struct removed)
+- `go.mod`: Removed mysql driver dependency
+- `contrib/labelstores/`: 227 additions (new extension framework)
+
 ## [0.8.0] - 2025-11-01
 
 This is the first independent release of **lgtm-lbac-proxy**, forked from [multena-proxy](https://github.com/gepaplexx/multena-proxy) by Gepardec. This release focuses on completing LGTM stack support and establishing production-ready Kubernetes deployment capabilities.
