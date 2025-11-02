@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -199,6 +201,11 @@ func setupTestMain() (App, map[string]string) {
 	}
 
 	app.LabelStore = &cmh
+	// Set up a mock TLS config for testing (WithTLSConfig() requires system CA files)
+	app.TlS = &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	app.WithProxies()
 	return app, tokens
 }
 
@@ -583,7 +590,7 @@ func TestLogAndWriteError(t *testing.T) {
 
 func TestGetLabelPolicyMerge(t *testing.T) {
 	parser := NewPolicyParser()
-	
+
 	store := FileLabelStore{
 		parser:      parser,
 		policyCache: make(map[string]*LabelPolicy),
@@ -608,34 +615,34 @@ func TestGetLabelPolicyMerge(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Simulate user with multiple groups
 	identity := UserIdentity{
 		Username: "not-a-user",
 		Groups:   []string{"group1", "group2"},
 	}
-	
+
 	policy, err := store.GetLabelPolicy(identity, "tenant_id")
 	if err != nil {
 		t.Fatalf("Error getting policy: %v", err)
 	}
-	
+
 	t.Logf("Merged Policy: Logic=%s", policy.Logic)
 	t.Logf("Rules count: %d", len(policy.Rules))
 	for i, rule := range policy.Rules {
 		t.Logf("Rule %d: Name=%s, Operator=%s, Values=%v", i, rule.Name, rule.Operator, rule.Values)
 	}
-	
+
 	// Verify logic is OR
 	if policy.Logic != LogicOR {
 		t.Errorf("Expected Logic=OR, got %s", policy.Logic)
 	}
-	
+
 	// Verify we have 2 rules
 	if len(policy.Rules) != 2 {
 		t.Errorf("Expected 2 rules, got %d", len(policy.Rules))
 	}
-	
+
 	// Build allowed values map
 	allowedValues := make(map[string]bool)
 	for _, rule := range policy.Rules {
@@ -645,9 +652,9 @@ func TestGetLabelPolicyMerge(t *testing.T) {
 			}
 		}
 	}
-	
+
 	t.Logf("Allowed values: %v", allowedValues)
-	
+
 	// Verify all 4 values are allowed
 	expectedValues := []string{"allowed_group1", "also_allowed_group1", "allowed_group2", "also_allowed_group2"}
 	for _, v := range expectedValues {
@@ -655,4 +662,293 @@ func TestGetLabelPolicyMerge(t *testing.T) {
 			t.Errorf("Expected %s to be allowed", v)
 		}
 	}
+}
+
+// TestProxyInitialization tests that proxies are correctly initialized for configured upstreams
+func TestProxyInitialization(t *testing.T) {
+	tests := []struct {
+		name           string
+		lokiURL        string
+		thanosURL      string
+		tempoURL       string
+		expectLoki     bool
+		expectThanos   bool
+		expectTempo    bool
+	}{
+		{
+			name:         "All upstreams configured",
+			lokiURL:      "http://loki:3100",
+			thanosURL:    "http://thanos:9090",
+			tempoURL:     "http://tempo:3200",
+			expectLoki:   true,
+			expectThanos: true,
+			expectTempo:  true,
+		},
+		{
+			name:         "Only Loki configured",
+			lokiURL:      "http://loki:3100",
+			thanosURL:    "",
+			tempoURL:     "",
+			expectLoki:   true,
+			expectThanos: false,
+			expectTempo:  false,
+		},
+		{
+			name:         "Only Thanos configured",
+			lokiURL:      "",
+			thanosURL:    "http://thanos:9090",
+			tempoURL:     "",
+			expectLoki:   false,
+			expectThanos: true,
+			expectTempo:  false,
+		},
+		{
+			name:         "Only Tempo configured",
+			lokiURL:      "",
+			thanosURL:    "",
+			tempoURL:     "http://tempo:3200",
+			expectLoki:   false,
+			expectThanos: false,
+			expectTempo:  true,
+		},
+		{
+			name:         "No upstreams configured",
+			lokiURL:      "",
+			thanosURL:    "",
+			tempoURL:     "",
+			expectLoki:   false,
+			expectThanos: false,
+			expectTempo:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := &App{}
+			app.WithConfig()
+
+			// Set URLs
+			app.Cfg.Loki.URL = tt.lokiURL
+			app.Cfg.Thanos.URL = tt.thanosURL
+			app.Cfg.Tempo.URL = tt.tempoURL
+
+			// Mock TLS config
+			app.TlS = &tls.Config{InsecureSkipVerify: true}
+
+			// Initialize proxies
+			app.WithProxies()
+
+			// Verify proxy initialization
+			if tt.expectLoki && app.lokiProxy == nil {
+				t.Errorf("Expected Loki proxy to be initialized, got nil")
+			}
+			if !tt.expectLoki && app.lokiProxy != nil {
+				t.Errorf("Expected Loki proxy to be nil, got %v", app.lokiProxy)
+			}
+
+			if tt.expectThanos && app.thanosProxy == nil {
+				t.Errorf("Expected Thanos proxy to be initialized, got nil")
+			}
+			if !tt.expectThanos && app.thanosProxy != nil {
+				t.Errorf("Expected Thanos proxy to be nil, got %v", app.thanosProxy)
+			}
+
+			if tt.expectTempo && app.tempoProxy == nil {
+				t.Errorf("Expected Tempo proxy to be initialized, got nil")
+			}
+			if !tt.expectTempo && app.tempoProxy != nil {
+				t.Errorf("Expected Tempo proxy to be nil, got %v", app.tempoProxy)
+			}
+		})
+	}
+}
+
+// TestProxyUsesDirectReverseProxy verifies that proxies use direct ReverseProxy instantiation
+func TestProxyUsesDirectReverseProxy(t *testing.T) {
+	app := &App{}
+	app.WithConfig()
+	app.Cfg.Loki.URL = "http://loki:3100"
+	app.TlS = &tls.Config{InsecureSkipVerify: true}
+
+	app.WithProxies()
+
+	if app.lokiProxy == nil {
+		t.Fatal("Loki proxy should be initialized")
+	}
+
+	// Verify that proxy has custom Director, ErrorHandler, and Transport
+	if app.lokiProxy.Director == nil {
+		t.Error("Expected custom Director function, got nil")
+	}
+	if app.lokiProxy.ErrorHandler == nil {
+		t.Error("Expected custom ErrorHandler function, got nil")
+	}
+	if app.lokiProxy.ModifyResponse == nil {
+		t.Error("Expected custom ModifyResponse function, got nil")
+	}
+	if app.lokiProxy.Transport == nil {
+		t.Error("Expected custom Transport, got nil")
+	}
+}
+
+// TestGetProxyConfigDefaults tests default proxy configuration values
+func TestGetProxyConfigDefaults(t *testing.T) {
+	cfg := &Config{}
+
+	// Get config with no overrides (should use built-in defaults)
+	proxyCfg := cfg.GetProxyConfig(nil)
+
+	assert.Equal(t, 60*time.Second, proxyCfg.RequestTimeout, "RequestTimeout should be 60s")
+	assert.Equal(t, 90*time.Second, proxyCfg.IdleConnTimeout, "IdleConnTimeout should be 90s")
+	assert.Equal(t, 10*time.Second, proxyCfg.TLSHandshakeTimeout, "TLSHandshakeTimeout should be 10s")
+	assert.Equal(t, 500, proxyCfg.MaxIdleConns, "MaxIdleConns should be 500")
+	assert.Equal(t, 100, proxyCfg.MaxIdleConnsPerHost, "MaxIdleConnsPerHost should be 100")
+	assert.True(t, proxyCfg.ForceHTTP2, "ForceHTTP2 should be true")
+}
+
+// TestGetProxyConfigGlobalOverrides tests global proxy configuration overrides
+func TestGetProxyConfigGlobalOverrides(t *testing.T) {
+	cfg := &Config{
+		Proxy: ProxyConfig{
+			RequestTimeout:      120 * time.Second,
+			IdleConnTimeout:     180 * time.Second,
+			TLSHandshakeTimeout: 20 * time.Second,
+			MaxIdleConns:        1000,
+			MaxIdleConnsPerHost: 200,
+			ForceHTTP2:          true, // Set to true to test global override
+		},
+	}
+
+	// Get config with global overrides
+	proxyCfg := cfg.GetProxyConfig(nil)
+
+	assert.Equal(t, 120*time.Second, proxyCfg.RequestTimeout, "RequestTimeout should use global override")
+	assert.Equal(t, 180*time.Second, proxyCfg.IdleConnTimeout, "IdleConnTimeout should use global override")
+	assert.Equal(t, 20*time.Second, proxyCfg.TLSHandshakeTimeout, "TLSHandshakeTimeout should use global override")
+	assert.Equal(t, 1000, proxyCfg.MaxIdleConns, "MaxIdleConns should use global override")
+	assert.Equal(t, 200, proxyCfg.MaxIdleConnsPerHost, "MaxIdleConnsPerHost should use global override")
+	assert.True(t, proxyCfg.ForceHTTP2, "ForceHTTP2 should use global override")
+}
+
+// TestGetProxyConfigUpstreamOverrides tests upstream-specific configuration overrides
+func TestGetProxyConfigUpstreamOverrides(t *testing.T) {
+	cfg := &Config{
+		Proxy: ProxyConfig{
+			RequestTimeout:      60 * time.Second,
+			MaxIdleConnsPerHost: 100,
+		},
+	}
+
+	upstreamCfg := &ProxyConfig{
+		RequestTimeout:      300 * time.Second, // Override for slow queries
+		MaxIdleConnsPerHost: 50,                // Override for lower volume
+	}
+
+	// Get config with upstream-specific overrides
+	proxyCfg := cfg.GetProxyConfig(upstreamCfg)
+
+	assert.Equal(t, 300*time.Second, proxyCfg.RequestTimeout, "RequestTimeout should use upstream override")
+	assert.Equal(t, 50, proxyCfg.MaxIdleConnsPerHost, "MaxIdleConnsPerHost should use upstream override")
+	// Other values should still use built-in or global defaults
+	assert.Equal(t, 90*time.Second, proxyCfg.IdleConnTimeout, "IdleConnTimeout should use built-in default")
+}
+
+// TestGetProxyConfigPrecedence tests configuration precedence: upstream > global > built-in
+func TestGetProxyConfigPrecedence(t *testing.T) {
+	cfg := &Config{
+		Proxy: ProxyConfig{
+			RequestTimeout:      120 * time.Second, // Global override
+			MaxIdleConnsPerHost: 200,               // Global override
+		},
+	}
+
+	upstreamCfg := &ProxyConfig{
+		RequestTimeout: 300 * time.Second, // Upstream override (highest priority)
+		// MaxIdleConnsPerHost not set - should use global
+	}
+
+	proxyCfg := cfg.GetProxyConfig(upstreamCfg)
+
+	// Upstream override wins
+	assert.Equal(t, 300*time.Second, proxyCfg.RequestTimeout, "Upstream override should win")
+	// Global override wins over built-in
+	assert.Equal(t, 200, proxyCfg.MaxIdleConnsPerHost, "Global override should win over built-in")
+	// Built-in default when no overrides
+	assert.Equal(t, 90*time.Second, proxyCfg.IdleConnTimeout, "Built-in default should be used")
+}
+
+// TestCreateTransport tests HTTP transport creation with proxy configuration
+func TestCreateTransport(t *testing.T) {
+	app := &App{}
+
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	proxyCfg := ProxyConfig{
+		RequestTimeout:      60 * time.Second,
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+		MaxIdleConns:        500,
+		MaxIdleConnsPerHost: 100,
+		ForceHTTP2:          true,
+	}
+
+	transport := app.createTransport(proxyCfg, tlsConfig)
+
+	assert.NotNil(t, transport, "Transport should not be nil")
+	assert.Equal(t, tlsConfig, transport.TLSClientConfig, "TLS config should match")
+	assert.Equal(t, 500, transport.MaxIdleConns, "MaxIdleConns should match")
+	assert.Equal(t, 100, transport.MaxIdleConnsPerHost, "MaxIdleConnsPerHost should match")
+	assert.Equal(t, 0, transport.MaxConnsPerHost, "MaxConnsPerHost should be 0 (unlimited)")
+	assert.Equal(t, 90*time.Second, transport.IdleConnTimeout, "IdleConnTimeout should match")
+	assert.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout, "TLSHandshakeTimeout should match")
+	assert.False(t, transport.DisableCompression, "DisableCompression should be false")
+	assert.True(t, transport.ForceAttemptHTTP2, "ForceAttemptHTTP2 should match")
+}
+
+// TestEachUpstreamGetsOwnTransport verifies that each upstream has its own transport instance
+func TestEachUpstreamGetsOwnTransport(t *testing.T) {
+	app := &App{}
+	app.WithConfig()
+	app.Cfg.Loki.URL = "http://loki:3100"
+	app.Cfg.Thanos.URL = "http://thanos:9090"
+	app.Cfg.Tempo.URL = "http://tempo:3200"
+	app.TlS = &tls.Config{InsecureSkipVerify: true}
+
+	app.WithProxies()
+
+	if app.lokiProxy == nil || app.thanosProxy == nil || app.tempoProxy == nil {
+		t.Fatal("All proxies should be initialized")
+	}
+
+	// Get transport instances from each proxy
+	lokiTransport := app.lokiProxy.Transport
+	thanosTransport := app.thanosProxy.Transport
+	tempoTransport := app.tempoProxy.Transport
+
+	// Verify each proxy has its own transport instance (different memory addresses)
+	if lokiTransport == thanosTransport {
+		t.Error("Loki and Thanos should have separate transport instances")
+	}
+	if lokiTransport == tempoTransport {
+		t.Error("Loki and Tempo should have separate transport instances")
+	}
+	if thanosTransport == tempoTransport {
+		t.Error("Thanos and Tempo should have separate transport instances")
+	}
+}
+
+// TestBackwardCompatibilityMissingProxyConfig tests that missing proxy config sections work
+func TestBackwardCompatibilityMissingProxyConfig(t *testing.T) {
+	cfg := &Config{
+		// No Proxy section defined
+		Loki: LokiConfig{
+			URL: "http://loki:3100",
+			// No Proxy override defined
+		},
+	}
+
+	// Should use built-in defaults without errors
+	proxyCfg := cfg.GetProxyConfig(cfg.Loki.Proxy)
+
+	assert.Equal(t, 60*time.Second, proxyCfg.RequestTimeout, "Should use built-in defaults")
+	assert.Equal(t, 100, proxyCfg.MaxIdleConnsPerHost, "Should use built-in defaults")
 }

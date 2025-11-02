@@ -4,20 +4,45 @@ proxy:
   admin:
     bypass: false # enable admin bypass
     group: gepardec-run-admins # group name for admin bypass
+  # Global proxy configuration (optional - sensible defaults if not specified)
+  # These settings optimize HTTP client transport for high-throughput reverse proxy operations
+  # Configuration precedence: upstream-specific > global > built-in defaults
+  proxyConfig:
+    requestTimeout: 60s          # Maximum request duration (default: 60s)
+    idleConnTimeout: 90s         # Keep-alive duration for idle connections (default: 90s)
+    tlsHandshakeTimeout: 10s     # Timeout for TLS handshake (default: 10s)
+    maxIdleConns: 500            # Total idle connections across all upstreams (default: 500)
+    maxIdleConnsPerHost: 100     # Idle connections per upstream (default: 100)
+    forceHTTP2: true             # Enable HTTP/2 when available (default: true)
   thanos:
     url: https://thanos-querier.monitoring.svc.cluster.local:9091
     tenantLabel: namespace  # Default label name (used in extended format _rules)
+    # Per-upstream proxy configuration (optional - overrides global defaults)
+    # Uncomment to customize Thanos-specific timeouts and connection pooling
+    # proxy:
+    #   requestTimeout: 60s          # Override: Thanos query timeout
+    #   maxIdleConnsPerHost: 100     # Override: Connection pool size for Thanos
   loki:
     url: https://loki-query-frontend-http.logging.svc.cluster.local:3100
     tenantLabel: kubernetes_namespace_name  # Default label name (used in extended format _rules)
     actorHeader: X-Loki-Actor-Path
     headers:
       X-Scope-OrgID: application
+    # Per-upstream proxy configuration (optional - overrides global defaults)
+    # Example: Loki may need longer timeout for log queries and higher connection pool
+    # proxy:
+    #   requestTimeout: 120s         # Override: Loki queries can be slow
+    #   maxIdleConnsPerHost: 150     # Override: High log volume needs more connections
   tempo:
     url: https://tempo-query-frontend.tracing.svc.cluster.local:3200
     tenantLabel: resource.namespace  # Default label name (used in extended format _rules)
     actorHeader: ""
     headers: {}
+    # Per-upstream proxy configuration (optional - overrides global defaults)
+    # Example: Tempo trace queries may need longer timeout but fewer connections
+    # proxy:
+    #   requestTimeout: 300s         # Override: Trace queries need longer timeout
+    #   maxIdleConnsPerHost: 50      # Override: Lower volume, fewer connections needed
   alert:
     enabled: false # enable alerting
     tokenHeader: X-LGTM-Alert # header to use for the token

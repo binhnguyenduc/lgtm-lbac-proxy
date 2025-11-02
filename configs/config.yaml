@@ -25,6 +25,17 @@ dev:
   enabled: false # enable dev mode, but dont use in production
   username: example # username for dev mode
 
+# Global proxy configuration (optional - sensible defaults if not specified)
+# These settings optimize HTTP client transport for high-throughput reverse proxy operations
+# Configuration precedence: upstream-specific > global > built-in defaults
+#proxy:
+#  request_timeout: 60s          # Maximum request duration (default: 60s)
+#  idle_conn_timeout: 90s        # Keep-alive duration for idle connections (default: 90s)
+#  tls_handshake_timeout: 10s    # Timeout for TLS handshake (default: 10s)
+#  max_idle_conns: 500           # Total idle connections across all upstreams (default: 500)
+#  max_idle_conns_per_host: 100  # Idle connections per upstream (default: 100)
+#  force_http2: true             # Enable HTTP/2 when available (default: true)
+
 thanos:
   url: https://localhost:9091 # url to thanos querier
   tenant_label: namespace # label to use for tenant
@@ -33,6 +44,11 @@ thanos:
   headers:
     "example": "application" # header to use
     "compresion": "gzip" # header to use
+  # Per-upstream proxy configuration (optional - overrides global defaults)
+  # Uncomment to customize Thanos-specific timeouts and connection pooling
+  #proxy:
+  #  request_timeout: 60s          # Override: Thanos query timeout
+  #  max_idle_conns_per_host: 100  # Override: Connection pool size for Thanos
 
 loki:
   url: https://localhost:3100 # url to loki querier
@@ -41,6 +57,11 @@ loki:
   key: "./certs/loki/tls.key" # path to loki mtls key
   headers:
     "X-Scope-OrgID": "application" # header to use for loki tenant
+  # Per-upstream proxy configuration (optional - overrides global defaults)
+  # Example: Loki may need longer timeout for log queries and higher connection pool
+  #proxy:
+  #  request_timeout: 120s         # Override: Loki queries can be slow
+  #  max_idle_conns_per_host: 150  # Override: High log volume needs more connections
 
 tempo:
   url: https://localhost:3200 # url to tempo querier
@@ -50,6 +71,11 @@ tempo:
   headers:
     "X-Scope-OrgID": "application" # header to use for tempo tenant
   actor_header: "X-Tempo-User" # optional header for fair usage tracking (base64 encoded username)
+  # Per-upstream proxy configuration (optional - overrides global defaults)
+  # Example: Tempo trace queries may need longer timeout but fewer connections
+  #proxy:
+  #  request_timeout: 300s        # Override: Trace queries need longer timeout
+  #  max_idle_conns_per_host: 50  # Override: Lower volume, fewer connections needed
 
 labelstore:
   config_paths: # paths to search for label configuration files (labels.yaml)

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type LogConfig struct {
@@ -49,6 +50,17 @@ type DevConfig struct {
 	Username string `mapstructure:"username"`
 }
 
+// ProxyConfig contains HTTP client transport and timeout configuration for reverse proxy operations.
+// These settings optimize connection pooling and request handling for high-throughput scenarios.
+type ProxyConfig struct {
+	RequestTimeout      time.Duration `mapstructure:"request_timeout"`       // Maximum request duration
+	IdleConnTimeout     time.Duration `mapstructure:"idle_conn_timeout"`     // Keep-alive duration for idle connections
+	TLSHandshakeTimeout time.Duration `mapstructure:"tls_handshake_timeout"` // Timeout for TLS handshake
+	MaxIdleConns        int           `mapstructure:"max_idle_conns"`        // Total idle connections across all upstreams
+	MaxIdleConnsPerHost int           `mapstructure:"max_idle_conns_per_host"` // Idle connections per upstream
+	ForceHTTP2          bool          `mapstructure:"force_http2"`           // Enable HTTP/2 when available
+}
+
 type ThanosConfig struct {
 	URL          string            `mapstructure:"url"`
 	TenantLabel  string            `mapstructure:"tenant_label"`
@@ -57,6 +69,7 @@ type ThanosConfig struct {
 	Key          string            `mapstructure:"key"`
 	Headers      map[string]string `mapstructure:"headers"`
 	ActorHeader  string            `mapstructure:"actor_header"`
+	Proxy        *ProxyConfig      `mapstructure:"proxy"` // Per-upstream proxy configuration override
 }
 
 type LokiConfig struct {
@@ -67,6 +80,7 @@ type LokiConfig struct {
 	Key          string            `mapstructure:"key"`
 	Headers      map[string]string `mapstructure:"headers"`
 	ActorHeader  string            `mapstructure:"actor_header"`
+	Proxy        *ProxyConfig      `mapstructure:"proxy"` // Per-upstream proxy configuration override
 }
 
 type TempoConfig struct {
@@ -77,6 +91,7 @@ type TempoConfig struct {
 	Key          string            `mapstructure:"key"`
 	Headers      map[string]string `mapstructure:"headers"`
 	ActorHeader  string            `mapstructure:"actor_header"`
+	Proxy        *ProxyConfig      `mapstructure:"proxy"` // Per-upstream proxy configuration override
 }
 
 type Config struct {
@@ -85,6 +100,7 @@ type Config struct {
 	Admin      AdminConfig      `mapstructure:"admin"`
 	Alert      AlertConfig      `mapstructure:"alert"`
 	Dev        DevConfig        `mapstructure:"dev"`
+	Proxy      ProxyConfig      `mapstructure:"proxy"` // Global proxy configuration defaults
 	Thanos     ThanosConfig     `mapstructure:"thanos"`
 	Loki       LokiConfig       `mapstructure:"loki"`
 	Tempo      TempoConfig      `mapstructure:"tempo"`
@@ -314,4 +330,80 @@ func (a *App) validateTempoConfig() {
 		Str("tenant_label", a.Cfg.Tempo.TenantLabel).
 		Bool("use_mutual_tls", a.Cfg.Tempo.UseMutualTLS).
 		Msg("Tempo configuration validated")
+}
+
+// GetProxyConfig merges upstream-specific proxy configuration with global defaults.
+// Configuration precedence: upstream-specific > global > built-in defaults.
+// This allows per-upstream tuning while maintaining sensible global defaults.
+func (c *Config) GetProxyConfig(upstreamProxy *ProxyConfig) ProxyConfig {
+	// Start with built-in defaults optimized for reverse proxy operations
+	cfg := ProxyConfig{
+		RequestTimeout:      60 * time.Second,
+		IdleConnTimeout:     90 * time.Second,
+		TLSHandshakeTimeout: 10 * time.Second,
+		MaxIdleConns:        500,
+		MaxIdleConnsPerHost: 100,
+		ForceHTTP2:          true,
+	}
+
+	// Apply global proxy defaults if set
+	if c.Proxy.RequestTimeout > 0 {
+		cfg.RequestTimeout = c.Proxy.RequestTimeout
+	}
+	if c.Proxy.IdleConnTimeout > 0 {
+		cfg.IdleConnTimeout = c.Proxy.IdleConnTimeout
+	}
+	if c.Proxy.TLSHandshakeTimeout > 0 {
+		cfg.TLSHandshakeTimeout = c.Proxy.TLSHandshakeTimeout
+	}
+	if c.Proxy.MaxIdleConns > 0 {
+		cfg.MaxIdleConns = c.Proxy.MaxIdleConns
+	}
+	if c.Proxy.MaxIdleConnsPerHost > 0 {
+		cfg.MaxIdleConnsPerHost = c.Proxy.MaxIdleConnsPerHost
+	}
+	// ForceHTTP2 from global config
+	if c.Proxy.ForceHTTP2 {
+		cfg.ForceHTTP2 = c.Proxy.ForceHTTP2
+	}
+
+	// Apply upstream-specific overrides if set
+	if upstreamProxy != nil {
+		if upstreamProxy.RequestTimeout > 0 {
+			cfg.RequestTimeout = upstreamProxy.RequestTimeout
+		}
+		if upstreamProxy.IdleConnTimeout > 0 {
+			cfg.IdleConnTimeout = upstreamProxy.IdleConnTimeout
+		}
+		if upstreamProxy.TLSHandshakeTimeout > 0 {
+			cfg.TLSHandshakeTimeout = upstreamProxy.TLSHandshakeTimeout
+		}
+		if upstreamProxy.MaxIdleConns > 0 {
+			cfg.MaxIdleConns = upstreamProxy.MaxIdleConns
+		}
+		if upstreamProxy.MaxIdleConnsPerHost > 0 {
+			cfg.MaxIdleConnsPerHost = upstreamProxy.MaxIdleConnsPerHost
+		}
+		// ForceHTTP2 from upstream-specific config
+		if upstreamProxy.ForceHTTP2 {
+			cfg.ForceHTTP2 = upstreamProxy.ForceHTTP2
+		}
+	}
+
+	return cfg
+}
+
+// createTransport creates an HTTP transport with the specified proxy configuration and TLS settings.
+// Each upstream gets its own dedicated transport instance to enable per-upstream connection pooling.
+func (a *App) createTransport(proxyCfg ProxyConfig, tlsConfig *tls.Config) *http.Transport {
+	return &http.Transport{
+		TLSClientConfig:     tlsConfig,
+		MaxIdleConns:        proxyCfg.MaxIdleConns,
+		MaxIdleConnsPerHost: proxyCfg.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     0, // Unlimited active connections
+		IdleConnTimeout:     proxyCfg.IdleConnTimeout,
+		TLSHandshakeTimeout: proxyCfg.TLSHandshakeTimeout,
+		DisableCompression:  false,
+		ForceAttemptHTTP2:   proxyCfg.ForceHTTP2,
+	}
 }

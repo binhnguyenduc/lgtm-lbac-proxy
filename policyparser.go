@@ -21,13 +21,14 @@ func NewPolicyParser() *PolicyParser {
 // Only extended format with _rules key is supported.
 //
 // Extended format example:
-//   _rules:
-//     - name: namespace
-//       operator: "="
-//       values: ["prod", "staging"]
-//   _logic: AND
+//
+//	_rules:
+//	  - name: namespace
+//	    operator: "="
+//	    values: ["prod", "staging"]
+//	_logic: AND
 func (p *PolicyParser) ParseUserPolicy(data RawLabelData, defaultLabel string) (*LabelPolicy, error) {
-	if data == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return nil, fmt.Errorf("empty label data")
 	}
 
@@ -36,18 +37,18 @@ func (p *PolicyParser) ParseUserPolicy(data RawLabelData, defaultLabel string) (
 	if !hasRules {
 		// Check if this looks like simple format (has keys but no _rules)
 		if len(data) > 0 && !hasClusterWideOnly(data) {
-			return nil, fmt.Errorf("DEPRECATED FORMAT DETECTED: Simple label format is no longer supported in v0.12.0+\n\n"+
-				"Migration Required:\n"+
-				"  1. Build migration tool: cd cmd/migrate-labels && go build\n"+
-				"  2. Validate current format: ./migrate-labels -input labels.yaml -validate\n"+
-				"  3. Migrate to extended format: ./migrate-labels -input labels.yaml\n\n"+
-				"Required Extended Format Example:\n"+
-				"  username:\n"+
-				"    _rules:\n"+
-				"      - name: namespace\n"+
-				"        operator: \"=\"\n"+
-				"        values: [\"prod\", \"staging\"]\n"+
-				"    _logic: AND\n\n"+
+			return nil, fmt.Errorf("DEPRECATED FORMAT DETECTED: Simple label format is no longer supported in v0.12.0+\n\n" +
+				"Migration Required:\n" +
+				"  1. Build migration tool: cd cmd/migrate-labels && go build\n" +
+				"  2. Validate current format: ./migrate-labels -input labels.yaml -validate\n" +
+				"  3. Migrate to extended format: ./migrate-labels -input labels.yaml\n\n" +
+				"Required Extended Format Example:\n" +
+				"  username:\n" +
+				"    _rules:\n" +
+				"      - name: namespace\n" +
+				"        operator: \"=\"\n" +
+				"        values: [\"prod\", \"staging\"]\n" +
+				"    _logic: AND\n\n" +
 				"Documentation: See cmd/migrate-labels/README.md for detailed migration guide")
 		}
 		return nil, fmt.Errorf("missing required '_rules' key in label policy")

@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"runtime"
 
 	"github.com/MicahParks/keyfunc/v3"
@@ -23,6 +25,9 @@ type App struct {
 	TlS                 *tls.Config
 	ServiceAccountToken string
 	LabelStore          Labelstore
+	lokiProxy           *httputil.ReverseProxy
+	thanosProxy         *httputil.ReverseProxy
+	tempoProxy          *httputil.ReverseProxy
 	i                   *mux.Router
 	e                   *mux.Router
 	healthy             bool
@@ -45,6 +50,7 @@ func main() {
 		WithTLSConfig().
 		WithJWKS().
 		WithLabelStore().
+		WithProxies().
 		WithHealthz().
 		WithRoutes().
 		StartServer()
@@ -72,4 +78,106 @@ func (a *App) StartServer() {
 			log.Fatal().Err(err).Msg("Error while serving proxy")
 		}
 	}()
+}
+
+// WithProxies initializes reverse proxy instances for each configured upstream.
+// Each proxy gets its own dedicated transport with per-upstream configuration.
+func (a *App) WithProxies() *App {
+	log.Info().Msg("Initializing reverse proxies")
+
+	// Initialize Loki proxy if URL is configured
+	if a.Cfg.Loki.URL != "" {
+		proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Loki.Proxy)
+		transport := a.createTransport(proxyCfg, a.TlS)
+		a.lokiProxy = a.createProxy(a.Cfg.Loki.URL, a.Cfg.Loki.ActorHeader, transport, "loki")
+		log.Info().
+			Str("url", a.Cfg.Loki.URL).
+			Dur("request_timeout", proxyCfg.RequestTimeout).
+			Int("max_idle_conns_per_host", proxyCfg.MaxIdleConnsPerHost).
+			Msg("Loki proxy initialized")
+	}
+
+	// Initialize Thanos proxy if URL is configured
+	if a.Cfg.Thanos.URL != "" {
+		proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Thanos.Proxy)
+		transport := a.createTransport(proxyCfg, a.TlS)
+		a.thanosProxy = a.createProxy(a.Cfg.Thanos.URL, a.Cfg.Thanos.ActorHeader, transport, "thanos")
+		log.Info().
+			Str("url", a.Cfg.Thanos.URL).
+			Dur("request_timeout", proxyCfg.RequestTimeout).
+			Int("max_idle_conns_per_host", proxyCfg.MaxIdleConnsPerHost).
+			Msg("Thanos proxy initialized")
+	}
+
+	// Initialize Tempo proxy if URL is configured
+	if a.Cfg.Tempo.URL != "" {
+		proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Tempo.Proxy)
+		transport := a.createTransport(proxyCfg, a.TlS)
+		a.tempoProxy = a.createProxy(a.Cfg.Tempo.URL, a.Cfg.Tempo.ActorHeader, transport, "tempo")
+		log.Info().
+			Str("url", a.Cfg.Tempo.URL).
+			Dur("request_timeout", proxyCfg.RequestTimeout).
+			Int("max_idle_conns_per_host", proxyCfg.MaxIdleConnsPerHost).
+			Msg("Tempo proxy initialized")
+	}
+
+	return a
+}
+
+// createProxy creates a reverse proxy with custom Director, ErrorHandler, and ModifyResponse.
+// Using direct ReverseProxy instantiation instead of NewSingleHostReverseProxy for better control.
+func (a *App) createProxy(targetURL string, actorHeader string, transport *http.Transport, upstream string) *httputil.ReverseProxy {
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		log.Fatal().Err(err).Str("url", targetURL).Str("upstream", upstream).Msg("Failed to parse upstream URL")
+	}
+
+	proxy := &httputil.ReverseProxy{
+		// Custom Director for URL rewriting and actor header injection
+		Director: func(req *http.Request) {
+			req.URL.Scheme = target.Scheme
+			req.URL.Host = target.Host
+			req.Host = target.Host
+
+			// Inject actor header if configured (base64 encoded username for fair usage tracking)
+			if actorHeader != "" {
+				if username, ok := req.Context().Value("username").(string); ok && username != "" {
+					req.Header.Set(actorHeader, username)
+				} else if email, ok := req.Context().Value("email").(string); ok && email != "" {
+					req.Header.Set(actorHeader, email)
+				}
+			}
+
+			log.Debug().
+				Str("upstream", upstream).
+				Str("method", req.Method).
+				Str("path", req.URL.Path).
+				Msg("Proxying request")
+		},
+
+		// Custom ErrorHandler with detailed logging per upstream
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Error().
+				Err(err).
+				Str("upstream", upstream).
+				Str("method", r.Method).
+				Str("path", r.URL.Path).
+				Msg("Proxy error")
+			http.Error(w, "Bad Gateway", http.StatusBadGateway)
+		},
+
+		// ModifyResponse for response inspection and metrics logging
+		ModifyResponse: func(resp *http.Response) error {
+			log.Debug().
+				Str("upstream", upstream).
+				Int("status", resp.StatusCode).
+				Str("content_length", resp.Header.Get("Content-Length")).
+				Msg("Response received")
+			return nil
+		},
+
+		Transport: transport,
+	}
+
+	return proxy
 }

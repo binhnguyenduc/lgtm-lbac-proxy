@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -93,12 +94,14 @@ func (a *App) WithLoki() *App {
 		{Url: "/api/v1/query_exemplars", MatchWord: "query"},
 	}
 	lokiRouter := a.e.PathPrefix("/loki").Subrouter()
+	proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Loki.Proxy)
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Loki route")
-		lokiRouter.HandleFunc(route.Url, handler(route.MatchWord,
+		lokiRouter.HandleFunc(route.Url, handlerWithProxy(route.MatchWord,
 			LogQLEnforcer(struct{}{}),
 			a.Cfg.Loki.TenantLabel,
-			a.Cfg.Loki.URL,
+			a.lokiProxy,
+			proxyCfg,
 			a.Cfg.Loki.UseMutualTLS,
 			a.Cfg.Loki.Headers,
 			a)).Name(route.Url)
@@ -135,12 +138,14 @@ func (a *App) WithTempo() *App {
 		{Url: "/api/v2/traces/{traceID}", MatchWord: ""},
 	}
 	tempoRouter := a.e.PathPrefix("/tempo").Subrouter()
+	proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Tempo.Proxy)
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Tempo route")
-		tempoRouter.HandleFunc(route.Url, handler(route.MatchWord,
+		tempoRouter.HandleFunc(route.Url, handlerWithProxy(route.MatchWord,
 			TraceQLEnforcer(struct{}{}),
 			a.Cfg.Tempo.TenantLabel,
-			a.Cfg.Tempo.URL,
+			a.tempoProxy,
+			proxyCfg,
 			a.Cfg.Tempo.UseMutualTLS,
 			a.Cfg.Tempo.Headers,
 			a)).Name(route.Url)
@@ -185,13 +190,15 @@ func (a *App) WithThanos() *App {
 		{Url: "/api/v1/index/stats", MatchWord: "query"},
 	}
 	thanosRouter := a.e.PathPrefix("").Subrouter()
+	proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Thanos.Proxy)
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Thanos route")
 		thanosRouter.HandleFunc(route.Url,
-			handler(route.MatchWord,
+			handlerWithProxy(route.MatchWord,
 				PromQLEnforcer(struct{}{}),
 				a.Cfg.Thanos.TenantLabel,
-				a.Cfg.Thanos.URL,
+				a.thanosProxy,
+				proxyCfg,
 				a.Cfg.Thanos.UseMutualTLS,
 				a.Cfg.Thanos.Headers,
 				a)).Name(route.Url)
@@ -200,23 +207,58 @@ func (a *App) WithThanos() *App {
 	return a
 }
 
+// handlerWithProxy orchestrates the request flow through the proxy using pre-created
+// reverse proxy instances, comprising authentication, conditional enforcement, request
+// timeouts, and forwarding to the upstream server.
+//
+// This function uses pre-created proxy instances for better performance through connection
+// reuse and per-upstream configuration. Request timeouts are enforced using context deadlines.
+func handlerWithProxy(matchWord string, enforcer EnforceQL, tl string, proxy *httputil.ReverseProxy, proxyCfg ProxyConfig, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Create timeout context for the request
+		ctx, cancel := context.WithTimeout(r.Context(), proxyCfg.RequestTimeout)
+		defer cancel()
+		r = r.WithContext(ctx)
+
+		oauthToken, err := getToken(r, a)
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "")
+			return
+		}
+
+		// Policy-based enforcement (only method supported)
+		policy, skip, err := validateLabelPolicy(oauthToken, tl, a)
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "")
+			return
+		}
+
+		// Store user information in context for actor header injection in Director function
+		ctx = context.WithValue(ctx, "username", oauthToken.PreferredUsername)
+		ctx = context.WithValue(ctx, "email", oauthToken.Email)
+		r = r.WithContext(ctx)
+
+		if skip {
+			setHeaders(r, tls, headers, a.ServiceAccountToken)
+			proxy.ServeHTTP(w, r)
+			return
+		}
+
+		err = enforceRequest(r, enforcer, policy, matchWord)
+		if err != nil {
+			logAndWriteError(w, http.StatusForbidden, err, "")
+			return
+		}
+
+		setHeaders(r, tls, headers, a.ServiceAccountToken)
+		proxy.ServeHTTP(w, r)
+	}
+}
+
 // handler function orchestrates the request flow through the proxy, comprising
 // authentication, conditional enforcement, and forwarding to the upstream server.
-//
-// Initially, it retrieves the OAuth token and validates it.
-//
-// Subsequently, it validates labels retrieved from the token and determines whether
-// enforcement should be skipped based on them. If an error occurs during label
-// validation, it is logged and a forbidden status response is dispatched. If enforcement
-// is opted to be skipped, the request is streamed directly to the upstream server without
-// further checks.
-//
-// If the flow doesn’t skip enforcement, the function enforces the request based on the
-// provided labels and other relevant parameters. Should any enforcement error arise, it is
-// logged and a forbidden status is sent to the client.
-//
-// Finally, if all checks and possible enforcement pass successfully, the request is
-// streamed to the upstream server.
+// This is the legacy handler kept for backward compatibility during migration.
+// DEPRECATED: Use handlerWithProxy instead for better performance.
 func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
 	upstreamURL, err := url.Parse(dsURL)
 	if err != nil {
