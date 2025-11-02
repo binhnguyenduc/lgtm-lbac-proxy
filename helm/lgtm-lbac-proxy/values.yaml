@@ -24,10 +24,13 @@ proxy:
     certUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
     cert: '' # local jwks cert
   web:
-    labelStoreKind: configmap # label provider: configmap only
     oauthGroupName: "groups"
     jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
     tlsVerifySkip: false # skip tls verification very insecurely!!!
+  labelStore:
+    configPaths: # paths to search for label configuration files
+      - /etc/config/labels/ # Kubernetes ConfigMap mount path
+      - ./configs # Local development path
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: 65534

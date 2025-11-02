@@ -17,7 +17,6 @@ data:
       host: "0.0.0.0"
       tls_verify_skip: {{ .Values.proxy.web.tlsVerifySkip}}
       trusted_root_ca_path: "/etc/secrets/ca"
-      label_store_kind: {{ .Values.proxy.web.labelStoreKind }}
       jwks_cert_url: {{ .Values.proxy.web.jwksCertUrl }}
       oauth_group_name: {{ .Values.proxy.web.oauthGroupName }}
 
@@ -65,4 +64,10 @@ data:
       headers:
         {{- range $key, $value := .Values.proxy.tempo.headers }}
         {{ $key }}: {{ $value }}
+        {{- end }}
+
+    labelstore:
+      config_paths:
+        {{- range .Values.proxy.labelStore.configPaths }}
+        - {{ . }}
         {{- end }}

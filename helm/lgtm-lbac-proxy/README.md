@@ -6,8 +6,8 @@ Helm chart for deploying LGTM LBAC Proxy on Kubernetes.
 
 This Helm chart deploys the LGTM LBAC Proxy, providing Label-Based Access Control for the complete LGTM observability stack (Loki, Grafana, Tempo, Mimir/Prometheus).
 
-**Chart Version**: 1.8.0
-**App Version**: 0.7.0
+**Chart Version**: 1.9.0
+**App Version**: 0.9.1
 **Kubernetes**: >= 1.19
 
 ## Features
@@ -113,8 +113,8 @@ proxy:
     cert: ""               # Optional: Local JWKS cert
 
   web:
-    labelStoreKind: configmap  # Label storage: configmap only
     oauthGroupName: groups     # JWT claim for groups
+    jwksCertUrl: https://your-oauth.com/certs
     tlsVerifySkip: false       # Skip TLS verification (insecure!)
 
   podSecurityContext:

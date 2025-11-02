@@ -20,6 +20,23 @@ type OAuthToken struct {
 	jwt.RegisteredClaims
 }
 
+// UserIdentity represents the minimal identity information needed for label lookup.
+// This is authentication-agnostic and focuses on the authorization concern.
+type UserIdentity struct {
+	Username string   // Primary user identifier
+	Groups   []string // Group memberships for the user
+}
+
+// ToIdentity extracts the identity information from an OAuth token.
+// This helper encapsulates the conversion from authentication-specific
+// token format to the authorization-focused identity representation.
+func (t OAuthToken) ToIdentity() UserIdentity {
+	return UserIdentity{
+		Username: t.PreferredUsername,
+		Groups:   t.Groups,
+	}
+}
+
 // getToken retrieves the OAuth token from the incoming HTTP request.
 // It extracts, parses, and validates the token from the configured authentication header.
 func getToken(r *http.Request, a *App) (OAuthToken, error) {
@@ -99,7 +116,7 @@ func validateLabels(token OAuthToken, a *App) (map[string]bool, bool, error) {
 		return nil, true, nil
 	}
 
-	tenantLabels, skip := a.LabelStore.GetLabels(token)
+	tenantLabels, skip := a.LabelStore.GetLabels(token.ToIdentity())
 	if skip {
 		log.Debug().Str("user", token.PreferredUsername).Bool("Admin", false).Msg("Skipping label enforcement")
 		return nil, true, nil

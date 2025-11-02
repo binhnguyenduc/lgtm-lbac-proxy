@@ -50,4 +50,4 @@ go test ./contrib/labelstores/my-store/...
 
 ## Reference
 
-See `labelstore.go` in the project root for the official `ConfigMapHandler` implementation.
+See `labelstore.go` in the project root for the official `FileLabelStore` implementation.

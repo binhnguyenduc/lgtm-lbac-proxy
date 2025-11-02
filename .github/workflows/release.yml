@@ -192,6 +192,7 @@ jobs:
           image: ${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }}
           format: cyclonedx-json
           output-file: sbom.json
+          upload-release-assets: false
 
       # Scan image with Trivy before pushing
       # Note: exit-code set to 0 to not block on false positives

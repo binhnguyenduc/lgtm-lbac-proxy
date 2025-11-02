@@ -80,14 +80,28 @@ type TempoConfig struct {
 }
 
 type Config struct {
-	Log    LogConfig    `mapstructure:"log"`
-	Web    WebConfig    `mapstructure:"web"`
-	Admin  AdminConfig  `mapstructure:"admin"`
-	Alert  AlertConfig  `mapstructure:"alert"`
-	Dev    DevConfig    `mapstructure:"dev"`
-	Thanos ThanosConfig `mapstructure:"thanos"`
-	Loki   LokiConfig   `mapstructure:"loki"`
-	Tempo  TempoConfig  `mapstructure:"tempo"`
+	Log        LogConfig        `mapstructure:"log"`
+	Web        WebConfig        `mapstructure:"web"`
+	Admin      AdminConfig      `mapstructure:"admin"`
+	Alert      AlertConfig      `mapstructure:"alert"`
+	Dev        DevConfig        `mapstructure:"dev"`
+	Thanos     ThanosConfig     `mapstructure:"thanos"`
+	Loki       LokiConfig       `mapstructure:"loki"`
+	Tempo      TempoConfig      `mapstructure:"tempo"`
+	LabelStore LabelStoreConfig `mapstructure:"labelstore"`
+}
+
+// LabelStoreConfig contains configuration needed by label stores during initialization.
+// This is a focused configuration subset, avoiding coupling to the entire App struct.
+type LabelStoreConfig struct {
+	// ConfigPaths are directories to search for label configuration files.
+	// Label stores should check these paths in order for their config files.
+	// Default: ["/etc/config/labels/", "./configs"]
+	ConfigPaths []string `mapstructure:"config_paths"`
+
+	// Additional configuration fields can be added here by custom label store implementations
+	// without breaking the existing FileLabelStore. Each label store implementation should
+	// document which fields it uses and ignore the rest.
 }
 
 func (a *App) WithConfig() *App {
@@ -96,6 +110,10 @@ func (a *App) WithConfig() *App {
 	v.SetConfigType("yaml")
 	v.AddConfigPath("/etc/config/config/")
 	v.AddConfigPath("./configs")
+
+	// Set defaults for label store configuration
+	v.SetDefault("labelstore::config_paths", []string{"/etc/config/labels/", "./configs"})
+
 	err := v.MergeInConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error no config found")
@@ -110,6 +128,10 @@ func (a *App) WithConfig() *App {
 	if a.Cfg.Web.AuthHeader == "" {
 		a.Cfg.Web.AuthHeader = "Authorization"
 	}
+	// Set default label store config paths if not configured
+	if len(a.Cfg.LabelStore.ConfigPaths) == 0 {
+		a.Cfg.LabelStore.ConfigPaths = []string{"/etc/config/labels/", "./configs"}
+	}
 	// Validate Tempo configuration if provided
 	a.validateTempoConfig()
 	v.OnConfigChange(func(e fsnotify.Event) {
@@ -122,6 +144,10 @@ func (a *App) WithConfig() *App {
 		// Set default auth header if not configured
 		if a.Cfg.Web.AuthHeader == "" {
 			a.Cfg.Web.AuthHeader = "Authorization"
+		}
+		// Set default label store config paths if not configured
+		if len(a.Cfg.LabelStore.ConfigPaths) == 0 {
+			a.Cfg.LabelStore.ConfigPaths = []string{"/etc/config/labels/", "./configs"}
 		}
 		// Validate Tempo configuration if provided
 		a.validateTempoConfig()

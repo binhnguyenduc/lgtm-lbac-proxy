@@ -5,6 +5,75 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2025-11-02
+
+### Added
+- ✨ **Label Store Configuration**: Added user-configurable label store settings
+  - New `proxy.labelStore.configPaths` configuration in values.yaml
+  - ConfigMap template now includes `labelstore.config_paths` section
+  - Allows users to customize paths where labels.yaml files are searched
+  - Default paths: `["/etc/config/labels/", "./configs"]`
+  - Example configuration:
+    ```yaml
+    proxy:
+      labelStore:
+        configPaths:
+          - /etc/config/labels/
+          - ./configs
+    ```
+
+### Changed
+- 📦 **App Version**: Updated to 0.9.1 (from 0.7.0)
+  - Includes architecture refactoring (FileLabelStore rename, interface cleanup)
+  - Includes configuration system improvements
+  - See [main CHANGELOG](../../CHANGELOG.md) for full application changes
+
+### Removed
+- 🗑️ **Obsolete Configuration**: Removed `labelStoreKind` configuration
+  - Field was already obsolete since v0.9.0 (file-based label store only)
+  - Removed from values.yaml (was `proxy.web.labelStoreKind`)
+  - Removed from configmaps.yaml template (was `web.label_store_kind`)
+  - Removed from README documentation
+  - No impact: configuration was unused and had no effect
+
+### Fixed
+- 📚 **Documentation**: Clarified label store configuration in README
+  - Added `jwksCertUrl` to web configuration example
+  - Removed references to removed `labelStoreKind` field
+  - Improved clarity around file-based label storage
+
+### Migration Notes
+
+**No Breaking Changes**: This release maintains full backward compatibility.
+
+**Configuration Cleanup**:
+- If your `values.yaml` contains `proxy.web.labelStoreKind: configmap`, you can safely remove it
+- The field is ignored and has no effect since v0.9.0
+
+**Label Store Paths**:
+- Default behavior unchanged: searches `/etc/config/labels/` and `./configs`
+- New: Can now customize paths via `proxy.labelStore.configPaths` if needed
+- Example use case: Custom ConfigMap mount locations, additional search paths
+
+**Recommended Actions**:
+```bash
+# 1. Review your values.yaml for obsolete configuration
+helm get values lgtm-lbac-proxy > current-values.yaml
+
+# 2. Remove obsolete labelStoreKind if present (optional cleanup)
+# Edit current-values.yaml and remove:
+#   proxy:
+#     web:
+#       labelStoreKind: configmap  # Remove this line
+
+# 3. Upgrade to v1.9.0
+helm upgrade lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  -f current-values.yaml \
+  --namespace observability
+```
+
+---
+
 ## [1.8.0] - 2025-01-01
 
 ### Added
@@ -142,4 +211,5 @@ This chart is based on the original multena-proxy Helm chart (v1.7.0) with signi
 
 **Note**: Version 1.7.0 was the last release of the original multena-proxy chart. This project continues from that baseline as version 1.8.0 with LGTM-focused enhancements.
 
+[1.9.0]: https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/tag/helm-chart-1.9.0
 [1.8.0]: https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/tag/v1.8.0

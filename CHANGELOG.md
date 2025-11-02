@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2025-11-02
+
+### Changed
+
+- **Refactoring**: Renamed `ConfigMapHandler` to `FileLabelStore` for platform-agnostic naming
+  - Updated all code references in `labelstore.go`, test files, and integration tests
+  - Updated documentation in `CLAUDE.md`, `contrib/labelstores/`, and OpenSpec files
+  - No functional changes or breaking changes to the API
+  - Improves clarity by reflecting file-based storage rather than Kubernetes-specific terminology
+
+- **⚠️ BREAKING CHANGE - Architecture**: Refactored `Labelstore` interface to eliminate leaked context
+  - **Interface Changes**:
+    - `Connect(App)` → `Connect(LabelStoreConfig)` - Label stores now receive focused configuration instead of entire App
+    - `GetLabels(OAuthToken)` → `GetLabels(UserIdentity)` - Label stores now receive minimal identity info, not auth-specific tokens
+  - **New Types**:
+    - `UserIdentity`: Authentication-agnostic identity struct with `Username` and `Groups`
+    - `LabelStoreConfig`: Focused configuration struct for label store initialization (currently contains `ConfigPaths`)
+  - **Benefits**:
+    - **Separation of Concerns**: Label stores focus on identity → labels mapping, not authentication details
+    - **Dependency Inversion**: Label stores depend on abstractions (`LabelStoreConfig`), not high-level App
+    - **Extensibility**: Support new auth methods (SAML, LDAP, certificates) without changing label store interface
+    - **Testability**: Label stores can be tested with minimal dependencies
+  - **Migration**: Custom label stores must update interface implementation (see `contrib/labelstores/README.md`)
+  - **No User Impact**: File-based label store behavior unchanged, only internal architecture improved
+
+- **Configuration**: Made `LabelStoreConfig` part of standard configuration system
+  - **User-Configurable**: Users can now configure label store paths directly in `config.yaml` via `labelstore.config_paths`
+  - **Default Values**: Defaults to `["/etc/config/labels/", "./configs"]` for Kubernetes and local development
+  - **Extensibility**: Custom label stores can add their own configuration fields to `LabelStoreConfig` without breaking existing stores
+  - **Removed**: `App.ToLabelStoreConfig()` method - configuration now read from standard config system
+  - **Example Configuration**:
+    ```yaml
+    labelstore:
+      config_paths:
+        - /etc/config/labels/  # Kubernetes ConfigMap mount path
+        - ./configs            # Local development path
+    ```
+  - **Helm Chart**: Updated `values.yaml` and `configmaps.yaml` template with labelstore configuration
+  - **Benefits**: Centralized configuration management, easier customization, clearer defaults
+
+### Fixed
+
+- **CI/CD**: Fixed GitHub Actions SBOM generation failure on tagged releases
+  - Added `upload-release-assets: false` to `anchore/sbom-action` configuration
+  - Prevents "Resource not accessible by integration" error when workflow lacks `contents: write` permission
+  - SBOM still uploaded as workflow artifact for security compliance
+  - Resolves issue where v0.9.0 and v0.8.0 CI jobs failed during SBOM generation step
+
 ## [0.9.0] - 2025-11-02
 
 This release simplifies the label store architecture by removing MySQL support and establishing a single, file-based implementation. This change reduces complexity, eliminates external dependencies, and provides a clearer extension pattern for community contributions.
@@ -186,4 +234,6 @@ This project is based on [multena-proxy](https://github.com/gepaplexx/multena-pr
 
 This is the first independent release. For history before the fork, see [multena-proxy releases](https://github.com/gepaplexx/multena-proxy/releases).
 
+[0.9.1]: https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/tag/v0.9.1
+[0.9.0]: https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/tag/v0.9.0
 [0.8.0]: https://github.com/binhnguyenduc/lgtm-lbac-proxy/releases/tag/v0.8.0

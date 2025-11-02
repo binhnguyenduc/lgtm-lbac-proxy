@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetLabelsCM(t *testing.T) {
-	cmh := ConfigMapHandler{
+	cmh := FileLabelStore{
 		labels: map[string]map[string]bool{
 			"user1":      {"u1": true, "u2": true},
 			"user2":      {"u3": true, "u4": true},
@@ -75,7 +75,7 @@ func TestGetLabelsCM(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			labels, skip := cmh.GetLabels(OAuthToken{PreferredUsername: tc.username, Groups: tc.groups})
+			labels, skip := cmh.GetLabels(UserIdentity{Username: tc.username, Groups: tc.groups})
 			assert.Equal(t, tc.expected, labels)
 			assert.Equal(t, tc.skip, skip)
 		})

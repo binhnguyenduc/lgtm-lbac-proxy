@@ -153,7 +153,7 @@ func setupTestMain() (App, map[string]string) {
 	app.Cfg.Thanos.TenantLabel = "tenant_id"
 	app.Cfg.Loki.TenantLabel = "tenant_id"
 
-	cmh := ConfigMapHandler{
+	cmh := FileLabelStore{
 		labels: map[string]map[string]bool{
 			"user":   {"allowed_user": true, "also_allowed_user": true},
 			"group1": {"allowed_group1": true, "also_allowed_group1": true},
