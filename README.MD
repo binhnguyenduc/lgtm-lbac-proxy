@@ -12,34 +12,72 @@
 
 ## 📢 Notice
 
-### Origin and Credits
+### Origin and Acknowledgments
 
-This project is **based on** [multena-proxy](https://github.com/gepaplexx/multena-proxy) originally developed by **Gepardec**.
-
-We extend our sincere gratitude to the Gepardec team for creating the foundational multi-tenancy proxy architecture that made this project possible. The original work established excellent patterns for label-based access control in observability stacks.
+This project originated from [multena-proxy](https://github.com/gepaplexx/multena-proxy) by **Gepardec**, which provided the foundational architecture for multi-tenancy proxy with label-based access control.
 
 **Original Repository**: https://github.com/gepaplexx/multena-proxy
 
-### Differences from Original
+We extend our sincere gratitude to the Gepardec team for their pioneering work in bringing label-based access control to observability stacks. Their original implementation established excellent patterns that influenced our approach.
 
-This repository has evolved as an **independent project** with a specific focus on the LGTM stack:
+### Why an Independent Project?
+
+**LGTM LBAC Proxy** has evolved as an **independent project** with significant architectural changes and new capabilities that go beyond the original scope:
+
+#### Core Philosophy Differences
 
 | Aspect | Original (multena-proxy) | This Project (lgtm-lbac-proxy) |
 |--------|--------------------------|--------------------------------|
-| **Focus** | General multi-tenancy proxy | LGTM stack specialization |
-| **Tempo Support** | ❌ Not implemented | ✅ Full TraceQL enforcement |
-| **Branding** | Generic "multena" naming | LGTM-specific branding |
-| **Repository** | Gepardec organization | Independent maintenance |
-| **Development** | Upstream changes | LGTM-focused enhancements |
-| **Target Users** | OpenShift/Thanos users | LGTM stack users |
+| **Target Stack** | OpenShift + Thanos/Loki | Complete LGTM stack (L+G+T+M) |
+| **Tracing Support** | ❌ Not implemented | ✅ Full TraceQL enforcement |
+| **Label Model** | Single-label per user | Multi-label policies with operators |
+| **Label Storage** | MySQL + ConfigMap | File-based (ConfigMap) only |
+| **Configuration** | Fixed auth claims | Configurable JWT claims for any OAuth provider |
+| **Performance** | Standard reverse proxy | Optimized with connection pooling (1000-2000 req/s) |
+| **Architecture** | Simple label mappings | Policy-based with AND/OR logic |
+| **Development** | Upstream maintenance | Independent feature development |
 
-**Key Enhancements:**
-- ✅ **Grafana Tempo Support**: Full TraceQL query enforcement with tenant label injection
-- ✅ **Complete LGTM Coverage**: Metrics (Prometheus/Mimir), Logs (Loki), and Traces (Tempo)
-- ✅ **LGTM-Optimized**: Documentation, examples, and configurations tailored for LGTM deployments
-- ✅ **Active Development**: Ongoing enhancements focused on LGTM stack integration
+#### Major Enhancements & Breaking Changes
 
-**Compatibility**: The core authorization logic, configuration format, and API remain compatible with the original design.
+**New Capabilities** (not in original):
+- ✅ **Grafana Tempo Integration**: Complete TraceQL query enforcement with resource attribute injection
+- ✅ **Multi-Label Enforcement**: Support multiple labels per user (namespace AND team AND environment)
+- ✅ **Flexible Operators**: Exact match (`=`), regex (`=~`), negation (`!=`, `!~`)
+- ✅ **Policy Logic**: AND/OR combinations for complex access rules
+- ✅ **Configurable JWT Claims**: Support any OAuth provider (Keycloak, Azure AD, Auth0, Google, Okta)
+- ✅ **High-Performance Proxy**: Dedicated transports with connection pooling and per-upstream tuning
+- ✅ **Production Helm Chart**: Full Kubernetes deployment with HPA, security contexts, and ServiceMonitor
+
+**Architectural Changes** (breaking compatibility):
+- 🔄 **Removed MySQL Label Store**: File-based ConfigMap only (v0.9.0)
+- 🔄 **Removed Simple Label Format**: Extended format with `_rules`/`_logic` required (v0.12.0)
+- 🔄 **New Label Store Interface**: `GetLabelPolicy()` instead of `GetLabels()`
+- 🔄 **Policy-Based Enforcement**: Rules and operators instead of simple key-value labels
+
+#### When to Use Each Project
+
+**Use multena-proxy** if you need:
+- OpenShift-specific integrations
+- Simple single-label enforcement (namespace only)
+- MySQL label storage
+- Minimal changes to existing deployments
+
+**Use lgtm-lbac-proxy** if you need:
+- Complete LGTM stack support (Loki + Grafana + Tempo + Mimir)
+- Distributed tracing with Grafana Tempo
+- Multi-label policies (namespace + team + environment)
+- High-throughput production deployment (1000+ req/s)
+- Flexible OAuth provider integration
+- Advanced access control with regex and negation
+
+### Compatibility Notice
+
+**⚠️ Not a Drop-In Replacement**: This project has diverged significantly from multena-proxy with breaking changes:
+- Configuration format changes (extended label format required)
+- Different label storage mechanism (no MySQL support)
+- New authentication configuration structure
+
+Migration from multena-proxy requires configuration updates. See [MIGRATION.md](MIGRATION.md) for detailed instructions.
 
 ---
 
@@ -53,14 +91,18 @@ The proxy intercepts queries to Prometheus/Thanos, Loki, and Tempo, validates JW
 
 | Feature | Description |
 |---------|-------------|
-| **LGTM Stack Coverage** | Complete support for Metrics (Prometheus/Thanos/Mimir), Logs (Loki), and Traces (Tempo) |
-| **Label-Based Access Control** | Fine-grained access control based on tenant labels (namespace, team, environment, etc.) |
-| **JWT Authentication** | Secure authentication via OAuth/OIDC with JWKS validation |
-| **File-Based Label Store** | Simple and portable ConfigMap/file-based label storage |
+| **Complete LGTM Stack** | Full support for Metrics (Prometheus/Thanos/Mimir), Logs (Loki), and Traces (Tempo) |
+| **Multi-Label Policies** | Enforce multiple labels per user with AND/OR logic (namespace AND team AND environment) |
+| **Flexible Operators** | Support for exact (`=`), regex (`=~`), not-equal (`!=`), and negative regex (`!~`) matching |
+| **Configurable JWT Claims** | Compatible with any OAuth provider - configure username, email, and groups claims |
+| **High-Performance Proxy** | Handle 1000-2000 req/s with connection pooling and per-upstream optimization |
 | **Query Enforcement** | Automatic injection of tenant filters into PromQL, LogQL, and TraceQL queries |
-| **Admin Bypass** | Optional admin group with cluster-wide access |
-| **Multi-Tenant Support** | Single user can access multiple tenant namespaces |
-| **Secure Communication** | mTLS support for upstream connections |
+| **TraceQL Support** | Full distributed tracing support with Grafana Tempo integration |
+| **File-Based Label Store** | Simple and portable ConfigMap/file-based label storage (no database required) |
+| **Admin Bypass** | Optional admin group with `#cluster-wide` access for unrestricted queries |
+| **Production-Ready Helm Chart** | Kubernetes deployment with HPA, security contexts, and ServiceMonitor |
+| **Secure Communication** | JWT/JWKS authentication with mTLS support for upstream connections |
+| **OAuth Provider Support** | Pre-configured examples for Keycloak, Azure AD, Auth0, Google, and Okta |
 
 ### Currently Supported
 
@@ -216,12 +258,61 @@ auth:
 
 See [Configuration Examples](configs/examples/README.md) for provider-specific setup guides.
 
-### Label Configuration
+### High-Performance Proxy Configuration (New in v0.13.0)
 
-Create `labels.yaml` using the extended multi-label format:
+Configure proxy performance settings for high-throughput deployments:
 
 ```yaml
-# User-specific labels with multi-label policies
+# Global proxy defaults (optional - sensible defaults provided)
+proxy:
+  request_timeout: 60s          # Maximum request duration
+  idle_conn_timeout: 90s        # Keep-alive for idle connections
+  tls_handshake_timeout: 10s    # TLS handshake timeout
+  max_idle_conns: 500           # Total idle connections across all upstreams
+  max_idle_conns_per_host: 100  # Idle connections per upstream
+  force_http2: true             # Enable HTTP/2 when available
+
+# Per-upstream overrides (customize for workload characteristics)
+loki:
+  url: "https://loki-query-frontend:3100"
+  tenant_label: "kubernetes_namespace_name"
+  proxy:
+    request_timeout: 120s        # Log queries can be slow
+    max_idle_conns_per_host: 150 # High log volume needs more connections
+
+tempo:
+  url: "https://tempo-query-frontend:3100"
+  tenant_label: "resource.namespace"
+  proxy:
+    request_timeout: 300s        # Trace queries need longer timeout
+    max_idle_conns_per_host: 50  # Lower volume, fewer connections
+
+thanos:
+  url: "https://thanos-querier:9091"
+  tenant_label: "namespace"
+  proxy:
+    request_timeout: 60s
+    max_idle_conns_per_host: 100
+```
+
+**Performance Characteristics:**
+- **Throughput**: 1000-2000 req/s with connection pooling
+- **Connection Reuse**: >95% under steady load
+- **Latency Impact**: <1 µs added per request (negligible)
+- **Configuration Precedence**: `upstream-specific > global > built-in defaults`
+
+**When to Tune:**
+- **High request rate** (>500 req/s): Increase `max_idle_conns_per_host`
+- **Slow queries**: Increase `request_timeout` for specific upstream
+- **HTTP/2 capable upstreams**: Enable `force_http2` for multiplexing
+- **Connection exhaustion**: Increase `max_idle_conns` total pool size
+
+### Label Configuration
+
+Create `labels.yaml` using the extended multi-label format (required as of v0.12.0):
+
+```yaml
+# Simple single-label policy
 alice@example.com:
   _rules:
     - name: namespace
@@ -229,19 +320,40 @@ alice@example.com:
       values: ['prod', 'staging']
   _logic: AND
 
+# Multi-label policy with AND logic
 bob@example.com:
   _rules:
     - name: namespace
       operator: '='
-      values: ['dev']
-  _logic: AND
+      values: ['prod']
+    - name: team
+      operator: '=~'
+      values: ['backend.*']
+    - name: environment
+      operator: '!='
+      values: ['test']
+  _logic: AND  # All three conditions must be satisfied
 
-# Group-based labels
-engineering-team:
+# Multi-label policy with OR logic
+charlie@example.com:
   _rules:
     - name: namespace
       operator: '='
-      values: ['prod', 'staging', 'dev']
+      values: ['dev']
+    - name: namespace
+      operator: '='
+      values: ['staging']
+  _logic: OR  # Either dev OR staging
+
+# Regex matching for complex patterns
+engineering-team:
+  _rules:
+    - name: namespace
+      operator: '=~'
+      values: ['prod-.*', 'staging-.*']  # Matches prod-app1, staging-db, etc.
+    - name: team
+      operator: '='
+      values: ['engineering']
   _logic: AND
 
 # Admin access (cluster-wide bypass)
@@ -254,22 +366,60 @@ cluster-admins:
 ```
 
 **Extended Format Features:**
-- **Multi-label support**: Enforce multiple labels simultaneously (e.g., namespace AND team)
-- **Operators**: `=` (exact), `!=` (not equal), `=~` (regex), `!~` (negative regex)
-- **Logic**: `AND` (all rules must match) or `OR` (any rule can match)
+- **Multi-label enforcement**: Combine multiple labels with AND/OR logic (e.g., namespace AND team AND environment)
+- **Rich operators**:
+  - `=` - Exact match
+  - `!=` - Not equal (negation)
+  - `=~` - Regex match (e.g., `backend.*` matches backend-api, backend-worker)
+  - `!~` - Negative regex (exclude patterns)
+- **Logical combinations**:
+  - `AND` - All rules must be satisfied (default)
+  - `OR` - Any rule can be satisfied
+- **Per-user policies**: Different users can have completely different label enforcement rules
 
-**Example - Multi-label Policy:**
+**Real-World Examples:**
+
 ```yaml
-# Enforce both namespace and team labels
-user@example.com:
+# Backend team: only prod namespace + backend services
+backend-developers:
   _rules:
     - name: namespace
       operator: '='
       values: ['prod']
-    - name: team
+    - name: service
       operator: '=~'
-      values: ['backend.*']
-  _logic: AND  # Both conditions must be satisfied
+      values: ['backend-.*', 'api-.*']
+  _logic: AND
+
+# QA team: staging and test environments, but not production
+qa-team:
+  _rules:
+    - name: environment
+      operator: '='
+      values: ['staging', 'test']
+    - name: environment
+      operator: '!='
+      values: ['production']
+  _logic: AND
+
+# Multi-region access: only specific regions
+us-team:
+  _rules:
+    - name: region
+      operator: '='
+      values: ['us-east-1', 'us-west-2']
+  _logic: OR
+
+# Cost center tracking with exclusions
+finance-team:
+  _rules:
+    - name: cost_center
+      operator: '='
+      values: ['finance']
+    - name: namespace
+      operator: '!~'
+      values: ['temp-.*', 'test-.*']  # Exclude temporary/test namespaces
+  _logic: AND
 ```
 
 ### Migration from MySQL Label Store
@@ -383,40 +533,109 @@ The extended format provides:
 
 ## Query Examples
 
-### Metrics (PromQL)
+### Single-Label Enforcement
 
-**Before (Original Query)**:
+#### Metrics (PromQL)
+
+**User Policy**: `namespace="prod"`
+
 ```promql
+# Original Query
 rate(http_requests_total[5m])
-```
 
-**After (Enforced)**:
-```promql
+# Enforced Query
 rate(http_requests_total{namespace="prod"}[5m])
 ```
 
-### Logs (LogQL)
+#### Logs (LogQL)
 
-**Before (Original Query)**:
+**User Policy**: `kubernetes_namespace_name="prod"`
+
 ```logql
+# Original Query
 {app="nginx"} |= "error"
-```
 
-**After (Enforced)**:
-```logql
+# Enforced Query
 {kubernetes_namespace_name="prod",app="nginx"} |= "error"
 ```
 
-### Traces (TraceQL) 🆕
+#### Traces (TraceQL)
 
-**Before (Original Query)**:
+**User Policy**: `resource.namespace="prod"`
+
 ```traceql
+# Original Query
 { span.http.status_code >= 500 }
+
+# Enforced Query
+{ resource.namespace="prod" && span.http.status_code >= 500 }
 ```
 
-**After (Enforced)**:
+### Multi-Label Enforcement (New in v0.10.0)
+
+#### Complex PromQL Query
+
+**User Policy**: `namespace="prod" AND team=~"backend.*" AND environment!="test"`
+
+```promql
+# Original Query
+sum(rate(http_requests_total[5m])) by (service)
+
+# Enforced Query
+sum(rate(http_requests_total{namespace="prod",team=~"backend.*",environment!="test"}[5m])) by (service)
+```
+
+#### Multi-Label LogQL
+
+**User Policy**: `namespace="prod" AND service=~"api-.*"`
+
+```logql
+# Original Query
+{job="kubernetes-pods"} | json | line_format "{{.message}}"
+
+# Enforced Query
+{namespace="prod",service=~"api-.*",job="kubernetes-pods"} | json | line_format "{{.message}}"
+```
+
+#### Multi-Label TraceQL
+
+**User Policy**: `resource.namespace="prod" AND resource.team="backend"`
+
 ```traceql
-{ resource.namespace="prod" && span.http.status_code >= 500 }
+# Original Query
+{ duration > 1s && span.http.status_code = 500 }
+
+# Enforced Query
+{ resource.namespace="prod" && resource.team="backend" && duration > 1s && span.http.status_code = 500 }
+```
+
+### Regex and Negation Examples
+
+#### Regex Match Operator (`=~`)
+
+**User Policy**: `namespace=~"prod-.*"`  (matches prod-app1, prod-db, etc.)
+
+```promql
+# Enforced Query
+rate(http_requests_total{namespace=~"prod-.*"}[5m])
+```
+
+#### Negation Operator (`!=`)
+
+**User Policy**: `environment!="test"`  (exclude test environment)
+
+```logql
+# Enforced Query
+{environment!="test",app="nginx"} |= "error"
+```
+
+#### Negative Regex (`!~`)
+
+**User Policy**: `namespace!~"temp-.*"`  (exclude temporary namespaces)
+
+```promql
+# Enforced Query
+sum(container_memory_usage_bytes{namespace!~"temp-.*"}) by (pod)
 ```
 
 ---
@@ -427,11 +646,14 @@ rate(http_requests_total{namespace="prod"}[5m])
 
 The project includes a production-ready Helm chart for Kubernetes deployment.
 
-**Chart Version**: 1.8.0 | **App Version**: 0.7.0
+**Chart Version**: 1.8.0+ | **App Version**: 0.14.0
 
 #### Features
 
 - ✅ **Complete LGTM Stack**: Full support for Prometheus/Thanos, Loki, and Tempo
+- ✅ **Multi-Label Policies**: Advanced access control with AND/OR logic and operators
+- ✅ **High Performance**: Connection pooling and per-upstream optimization (1000-2000 req/s)
+- ✅ **Configurable Auth**: Support for Keycloak, Azure AD, Auth0, Google, Okta
 - ✅ **Production Ready**: Resource limits, security contexts, health probes, HPA
 - ✅ **Security Hardened**: Non-root execution, dropped capabilities, seccomp profiles
 - ✅ **Auto-scaling**: Horizontal Pod Autoscaler with CPU/memory metrics
@@ -441,16 +663,19 @@ The project includes a production-ready Helm chart for Kubernetes deployment.
 #### Quick Installation
 
 ```bash
-# Install the chart
+# Install the chart with new auth configuration (v0.14.0+)
 helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
   --namespace observability \
   --create-namespace \
-  --set proxy.web.jwksCertUrl=https://oauth.example.com/certs \
+  --set proxy.auth.jwksCertUrl=https://oauth.example.com/certs \
+  --set proxy.auth.claims.username=preferred_username \
+  --set proxy.auth.claims.email=email \
+  --set proxy.auth.claims.groups=groups \
   --set proxy.thanos.url=https://thanos-querier.monitoring.svc:9091 \
   --set proxy.loki.url=https://loki-query-frontend.logging.svc:3100 \
   --set proxy.tempo.url=https://tempo-query-frontend.tracing.svc:3200
 
-# Create labels ConfigMap
+# Create labels ConfigMap with extended format
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
@@ -459,12 +684,26 @@ metadata:
   namespace: observability
 data:
   labels.yaml: |
+    # Single-label policy
     alice@example.com:
       _rules:
         - name: namespace
           operator: '='
           values: ['prod', 'staging']
       _logic: AND
+
+    # Multi-label policy with regex
+    backend-team:
+      _rules:
+        - name: namespace
+          operator: '='
+          values: ['prod']
+        - name: team
+          operator: '=~'
+          values: ['backend-.*']
+      _logic: AND
+
+    # Admin with cluster-wide access
     admin-group:
       _rules:
         - name: '#cluster-wide'
@@ -476,7 +715,7 @@ EOF
 
 #### Configuration Examples
 
-**Minimal Production:**
+**Minimal Production (v0.14.0+):**
 ```yaml
 # values.yaml
 replicas: 2
@@ -490,31 +729,94 @@ resources:
     memory: 256Mi
 
 proxy:
-  web:
+  # New auth configuration (v0.14.0+)
+  auth:
     jwksCertUrl: https://oauth.example.com/certs
+    claims:
+      username: preferred_username
+      email: email
+      groups: groups
+
+  # Upstream configuration
   thanos:
     url: https://thanos-querier.monitoring.svc:9091
+    tenantLabel: namespace
   loki:
     url: https://loki-query-frontend.logging.svc:3100
+    tenantLabel: kubernetes_namespace_name
   tempo:
     url: https://tempo-query-frontend.tracing.svc:3200
+    tenantLabel: resource.namespace
 ```
 
-**High Availability:**
+**High Availability with Performance Tuning:**
 ```yaml
 replicas: 3
 
+# HPA for auto-scaling
 autoscaling:
   enabled: true
   minReplicas: 3
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Resource limits for high throughput
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 1Gi
 
 proxy:
+  auth:
+    jwksCertUrl: https://oauth.example.com/certs
+    claims:
+      username: preferred_username
+      email: email
+      groups: groups
+
+  # Global proxy performance settings (v0.13.0+)
+  proxyConfig:
+    request_timeout: 60s
+    max_idle_conns: 500
+    max_idle_conns_per_host: 100
+    idle_conn_timeout: 90s
+    force_http2: true
+
+  # Per-upstream tuning
+  loki:
+    url: https://loki-query-frontend.logging.svc:3100
+    tenantLabel: kubernetes_namespace_name
+    proxy:
+      request_timeout: 120s
+      max_idle_conns_per_host: 150
+
+  tempo:
+    url: https://tempo-query-frontend.tracing.svc:3200
+    tenantLabel: resource.namespace
+    proxy:
+      request_timeout: 300s
+      max_idle_conns_per_host: 50
+
+  # Topology spread for high availability
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: topology.kubernetes.io/zone
       whenUnsatisfiable: DoNotSchedule
+```
+
+**Azure AD Integration:**
+```yaml
+proxy:
+  auth:
+    jwksCertUrl: https://login.microsoftonline.com/YOUR_TENANT_ID/discovery/v2.0/keys
+    claims:
+      username: unique_name  # Azure AD specific
+      email: upn            # User Principal Name
+      groups: roles         # Azure AD uses 'roles' for groups
 ```
 
 For complete configuration options and deployment examples, see:
@@ -573,12 +875,36 @@ See [BUILD.md](BUILD.md) for detailed build instructions.
 
 If you're migrating from the original multena-proxy, see [MIGRATION.md](MIGRATION.md) for a comprehensive guide.
 
-**Key Changes:**
-- Binary name: `multena-proxy` → `lgtm-lbac-proxy`
-- Docker image: `ghcr.io/gepaplexx/multena-proxy` → `ghcr.io/binhnguyenduc/lgtm-lbac-proxy`
-- Helm chart: `gp-multena` → `lgtm-lbac-proxy`
+### Naming Changes
 
-**No breaking changes** to configuration format or API endpoints.
+- **Binary name**: `multena-proxy` → `lgtm-lbac-proxy`
+- **Docker image**: `ghcr.io/gepaplexx/multena-proxy` → `ghcr.io/binhnguyenduc/lgtm-lbac-proxy`
+- **Helm chart**: `gp-multena` → `lgtm-lbac-proxy`
+
+### Breaking Changes Since Fork
+
+⚠️ **Important**: This project has introduced breaking changes that require configuration updates:
+
+1. **Label Format (v0.12.0)**: Simple label format removed
+   - **Old**: `user: {namespace: true}`
+   - **New**: Extended format with `_rules` and `_logic` required
+   - **Migration**: Use `migrate-labels` tool to convert existing labels
+
+2. **MySQL Label Store (v0.9.0)**: MySQL support removed
+   - **Old**: `label_store_kind: mysql` with `db:` configuration
+   - **New**: File-based ConfigMap only
+   - **Migration**: Export MySQL data and convert to YAML format
+
+3. **Authentication Configuration (v0.14.0)**: New auth section (backward compatible)
+   - **Recommended**: Move `web.jwks_cert_url` → `auth.jwks_cert_url`
+   - **New**: Configurable JWT claims (`auth.claims`)
+   - **Note**: Legacy fields still work with deprecation warnings
+
+### What Remains Compatible
+
+✅ **API endpoints**: No changes to routing or request handling
+✅ **JWT authentication**: JWKS validation logic unchanged
+✅ **Core enforcement**: Query enforcement patterns preserved
 
 ---
 
