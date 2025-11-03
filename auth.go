@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"unicode"
 
 	"github.com/rs/zerolog/log"
 
@@ -39,22 +40,38 @@ func (t OAuthToken) ToIdentity() UserIdentity {
 // getToken retrieves the OAuth token from the incoming HTTP request.
 // It extracts, parses, and validates the token from the configured authentication header.
 func getToken(r *http.Request, a *App) (OAuthToken, error) {
-	authToken := r.Header.Get(a.Cfg.Web.AuthHeader)
-	if authToken == "" {
-		if a.Cfg.Alert.Enabled && r.Header.Get(a.Cfg.Alert.TokenHeader) != "" {
-			authToken = r.Header.Get(a.Cfg.Alert.TokenHeader)
-		} else {
-			return OAuthToken{}, fmt.Errorf("no %s header found", a.Cfg.Web.AuthHeader)
+	scheme := strings.TrimSpace(a.Cfg.Auth.AuthScheme)
+	primaryHeader := a.Cfg.Web.AuthHeader
+	primaryValue := r.Header.Get(primaryHeader)
+	log.Trace().Str("header", primaryHeader).Str("value", primaryValue).Msg("Auth header value")
+
+	if primaryValue != "" {
+		tokenString, err := extractTokenValue(primaryValue, scheme, primaryHeader)
+		if err != nil {
+			return OAuthToken{}, err
 		}
-	}
-	log.Trace().Str("authToken", authToken).Msg("AuthToken")
-	splitToken := strings.Split(authToken, "Bearer")
-	log.Trace().Strs("splitToken", splitToken).Msg("SplitToken")
-	if len(splitToken) != 2 {
-		return OAuthToken{}, fmt.Errorf("invalid %s header", a.Cfg.Web.AuthHeader)
+		return parseAndValidateToken(tokenString, a)
 	}
 
-	oauthToken, token, err := parseJwtToken(strings.TrimSpace(splitToken[1]), a)
+	if a.Cfg.Alert.Enabled {
+		alertHeader := a.Cfg.Alert.TokenHeader
+		alertValue := r.Header.Get(alertHeader)
+		if alertValue == "" {
+			return OAuthToken{}, fmt.Errorf("no %s header found", primaryHeader)
+		}
+		log.Trace().Str("header", alertHeader).Str("value", alertValue).Msg("Alert header value")
+		tokenString, err := extractTokenValue(alertValue, scheme, alertHeader)
+		if err != nil {
+			return OAuthToken{}, err
+		}
+		return parseAndValidateToken(tokenString, a)
+	}
+
+	return OAuthToken{}, fmt.Errorf("no %s header found", primaryHeader)
+}
+
+func parseAndValidateToken(tokenString string, a *App) (OAuthToken, error) {
+	oauthToken, token, err := parseJwtToken(tokenString, a)
 	if err != nil {
 		return OAuthToken{}, fmt.Errorf("error parsing token")
 	}
@@ -62,6 +79,36 @@ func getToken(r *http.Request, a *App) (OAuthToken, error) {
 		return OAuthToken{}, fmt.Errorf("invalid token")
 	}
 	return oauthToken, nil
+}
+
+func extractTokenValue(headerValue, scheme, headerName string) (string, error) {
+	value := strings.TrimSpace(headerValue)
+	if value == "" {
+		return "", fmt.Errorf("invalid %s header", headerName)
+	}
+
+	if strings.TrimSpace(scheme) == "" {
+		return value, nil
+	}
+
+	if !strings.HasPrefix(value, scheme) {
+		return "", fmt.Errorf("invalid %s header", headerName)
+	}
+
+	remainder := value[len(scheme):]
+	if len(remainder) == 0 {
+		return "", fmt.Errorf("invalid %s header", headerName)
+	}
+
+	if !unicode.IsSpace(rune(remainder[0])) {
+		return "", fmt.Errorf("invalid %s header", headerName)
+	}
+
+	token := strings.TrimSpace(remainder)
+	if token == "" {
+		return "", fmt.Errorf("invalid %s header", headerName)
+	}
+	return token, nil
 }
 
 // parseJwtToken parses the JWT token string and constructs an OAuthToken from the parsed claims.

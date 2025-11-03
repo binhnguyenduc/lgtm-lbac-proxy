@@ -158,6 +158,83 @@ func TestGetToken_AlertModeFallback_CustomAuthHeader(t *testing.T) {
 	assert.Equal(t, "test@email.com", token.Email)
 }
 
+func TestGetToken_CustomScheme(t *testing.T) {
+	app, tokens := setupTestMain()
+	app.Cfg.Auth.AuthScheme = "Token"
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Token "+tokens["userTenant"])
+
+	token, err := getToken(req, &app)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "user", token.PreferredUsername)
+}
+
+func TestGetToken_EmptySchemeUsesRawToken(t *testing.T) {
+	app, tokens := setupTestMain()
+	app.Cfg.Auth.AuthScheme = ""
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", tokens["userTenant"])
+
+	token, err := getToken(req, &app)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "user", token.PreferredUsername)
+}
+
+func TestGetToken_InvalidSchemeFormat(t *testing.T) {
+	app, tokens := setupTestMain()
+	app.Cfg.Auth.AuthScheme = "Bearer"
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Token "+tokens["userTenant"])
+
+	token, err := getToken(req, &app)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Authorization")
+	assert.Equal(t, OAuthToken{}, token)
+}
+
+func TestGetToken_SchemeCaseSensitive(t *testing.T) {
+	app, tokens := setupTestMain()
+	app.Cfg.Auth.AuthScheme = "Bearer"
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "bearer "+tokens["userTenant"])
+
+	token, err := getToken(req, &app)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Authorization")
+	assert.Equal(t, OAuthToken{}, token)
+}
+
+func TestGetToken_SchemeWhitespaceHandling(t *testing.T) {
+	app, tokens := setupTestMain()
+	app.Cfg.Auth.AuthScheme = "Bearer"
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer   "+tokens["userTenant"])
+
+	token, err := getToken(req, &app)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "user", token.PreferredUsername)
+}
+
+func TestGetToken_AlertFallbackCustomScheme(t *testing.T) {
+	app, tokens := setupTestMain()
+	app.Cfg.Auth.AuthScheme = "Token"
+	app.Cfg.Alert.Enabled = true
+	app.Cfg.Alert.TokenHeader = "X-Alert-Token"
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Alert-Token", "Token "+tokens["userTenant"])
+
+	token, err := getToken(req, &app)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "user", token.PreferredUsername)
+}
+
 func TestParseJwtToken_DefaultClaimNames(t *testing.T) {
 	app, tokens := setupTestMain()
 	tokenString := tokens["userTenant"]

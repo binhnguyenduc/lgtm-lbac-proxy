@@ -6,8 +6,8 @@ Helm chart for deploying LGTM LBAC Proxy on Kubernetes.
 
 This Helm chart deploys the LGTM LBAC Proxy, providing Label-Based Access Control for the complete LGTM observability stack (Loki, Grafana, Tempo, Mimir/Prometheus).
 
-**Chart Version**: 1.9.0
-**App Version**: 0.9.1
+**Chart Version**: 1.12.0
+**App Version**: 0.15.0
 **Kubernetes**: >= 1.19
 
 ## Features
@@ -86,6 +86,15 @@ proxy:
   admin:
     bypass: false          # Enable admin bypass for cluster-wide access
     group: admin-group     # Admin group name
+
+  auth:
+    jwksCertUrl: https://oauth.example.com/certs
+    authHeader: "Authorization"
+    authScheme: "Bearer"   # Set to "" when upstream sends raw tokens
+    claims:
+      username: "preferred_username"
+      email: "email"
+      groups: "groups"
 
   thanos:
     url: https://thanos-querier.monitoring.svc:9091

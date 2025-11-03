@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2025-11-03
+
+This release introduces a configurable authentication scheme so deployments can consume JWT tokens that are prefixed with non-Bearer keywords or have no prefix at all.
+
+### Added
+
+- **Configurable Authentication Scheme**:
+  - New `auth.auth_scheme` configuration key (empty string for raw tokens, e.g. API gateways)
+  - Alert fallback header processing now honors the same scheme logic as the primary header
+  - Extended unit test suite covering custom schemes, raw tokens, whitespace handling, and alert fallback
+- **Documentation & Examples**:
+  - Updated `CLAUDE.md` and config examples with the new `auth_scheme` field
+  - Helm chart values and README document how to configure alternative schemes
+
+### Changed
+
+- **Token Extraction Logic**: Replaced hard-coded `"Bearer"` split with scheme-aware parsing that trims whitespace and validates prefixes
+- **Error Handling**: Proxy integration tests expect precise header errors for mismatched schemes across both primary and alert headers
+- **Helm Chart**: Chart version 1.12.0 now passes `proxy.auth.authScheme` into the generated ConfigMap
+
 ## [0.14.0] - 2025-11-02
 
 This release introduces **configurable JWT claims** and **dedicated auth configuration** for enhanced OAuth provider compatibility and cleaner configuration structure.

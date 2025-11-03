@@ -7,6 +7,7 @@ log:
 auth:
   jwks_cert_url: https://keycloak.example.com/realms/your-realm/protocol/openid-connect/certs
   auth_header: "Authorization"
+  auth_scheme: "Bearer"
   claims:
     username: "preferred_username"  # Standard Keycloak claim
     email: "email"                   # Standard email claim

@@ -7,6 +7,7 @@ log:
 auth:
   jwks_cert_url: https://login.microsoftonline.com/{tenant-id}/discovery/v2.0/keys
   auth_header: "Authorization"
+  auth_scheme: "Bearer"
   claims:
     username: "unique_name"          # Azure AD: unique_name or upn (User Principal Name)
     email: "upn"                     # Azure AD: upn or email

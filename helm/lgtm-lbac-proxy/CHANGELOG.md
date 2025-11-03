@@ -5,6 +5,20 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2025-11-03
+
+### Added
+
+- 🔐 **Configurable Authentication Scheme**: New `proxy.auth.authScheme` value passed to `auth.auth_scheme`
+  - Supports alternative prefixes such as `Token`, `JWT`, or empty string for raw tokens
+  - Included in generated ConfigMap and documented in chart README/values
+
+### Changed
+
+- **AppVersion**: Updated to 0.15.0 to match proxy release with configurable auth scheme
+- **Chart Version**: Bumped to 1.12.0
+- **Values/README**: Added documentation and defaults for `authScheme`, keeping comments aligned with examples
+
 ## [1.11.0] - 2025-11-02
 
 ### Added

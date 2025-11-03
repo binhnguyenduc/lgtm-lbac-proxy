@@ -52,6 +52,7 @@ proxy:
   auth:
     jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
     authHeader: "Authorization"
+    authScheme: "Bearer" # authentication scheme/prefix (set to "" for raw token)
     claims:
       username: "preferred_username"  # JWT claim for username (default: preferred_username)
       email: "email"                   # JWT claim for email (default: email)
@@ -198,4 +199,3 @@ migration:
     limits:
       cpu: 100m
       memory: 64Mi
-

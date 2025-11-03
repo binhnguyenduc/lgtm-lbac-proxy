@@ -16,6 +16,7 @@ data:
     auth:
       jwks_cert_url: {{ .Values.proxy.auth.jwksCertUrl | default .Values.proxy.web.jwksCertUrl }}
       auth_header: {{ .Values.proxy.auth.authHeader | default "Authorization" }}
+      auth_scheme: {{ ( .Values.proxy.auth.authScheme | default "Bearer" ) | quote }}
       claims:
         username: {{ .Values.proxy.auth.claims.username | default "preferred_username" }}
         email: {{ .Values.proxy.auth.claims.email | default "email" }}

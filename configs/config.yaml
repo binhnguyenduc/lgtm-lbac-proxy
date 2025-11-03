@@ -6,6 +6,7 @@ log:
 auth:
   jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs # url to jwks cert of oauth provider
   auth_header: "Authorization" # header name for JWT token
+  auth_scheme: "Bearer" # authentication scheme prefix (use "" for raw tokens)
   claims:
     username: "preferred_username" # JWT claim for username (default: preferred_username)
     email: "email"                 # JWT claim for email (default: email)

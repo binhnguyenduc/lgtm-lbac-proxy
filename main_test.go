@@ -256,7 +256,7 @@ func Test_reverseProxy(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "error parsing token\n",
+			expectedBody:     "invalid Authorization header\n",
 		},
 		{
 			name:             "Malformed_authorization_header:_Bearer_skk",
@@ -432,7 +432,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "B",
-			expectedBody:     "invalid Authorization header\n",
+			expectedBody:     "invalid X-LGTM-Alert-Token header\n",
 		},
 		{
 			name:             "Malformed_authorization_header:_Bearer",
@@ -440,7 +440,7 @@ func TestAlertAuth(t *testing.T) {
 			setAuthorization: true,
 			URL:              "/api/v1/query_range",
 			authorization:    "Bearer ",
-			expectedBody:     "error parsing token\n",
+			expectedBody:     "invalid X-LGTM-Alert-Token header\n",
 		},
 		{
 			name:             "Malformed_authorization_header:_Bearer_skk",
@@ -682,13 +682,13 @@ func TestGetLabelPolicyMerge(t *testing.T) {
 // TestProxyInitialization tests that proxies are correctly initialized for configured upstreams
 func TestProxyInitialization(t *testing.T) {
 	tests := []struct {
-		name           string
-		lokiURL        string
-		thanosURL      string
-		tempoURL       string
-		expectLoki     bool
-		expectThanos   bool
-		expectTempo    bool
+		name         string
+		lokiURL      string
+		thanosURL    string
+		tempoURL     string
+		expectLoki   bool
+		expectThanos bool
+		expectTempo  bool
 	}{
 		{
 			name:         "All upstreams configured",

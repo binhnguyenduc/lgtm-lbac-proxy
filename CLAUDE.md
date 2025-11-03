@@ -83,6 +83,7 @@ go test -bench=. -benchmem -run=^$
 auth:
   jwks_cert_url: "https://oauth.example.com/.well-known/jwks.json"  # REQUIRED
   auth_header: "Authorization"   # Header name for JWT
+  auth_scheme: "Bearer"          # Authentication scheme/prefix (set "" for raw token)
   claims:
     username: "preferred_username"  # JWT claim for username (configurable)
     email: "email"                   # JWT claim for email (configurable)
@@ -127,6 +128,8 @@ proxy:
   max_idle_conns: 500
   idle_conn_timeout: 90s
 ```
+
+`auth.auth_scheme` controls how the proxy parses tokens. Configure it with the exact prefix your identity provider emits (for example `Token`, `JWT`, or set it to an empty string to accept raw tokens without a prefix).
 
 ### OAuth Provider Configuration
 

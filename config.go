@@ -34,6 +34,7 @@ type ClaimsConfig struct {
 type AuthConfig struct {
 	JwksCertURL string       `mapstructure:"jwks_cert_url"` // JWKS endpoint URL for token validation
 	AuthHeader  string       `mapstructure:"auth_header"`   // HTTP header containing the JWT token
+	AuthScheme  string       `mapstructure:"auth_scheme"`   // Authentication scheme/prefix (e.g., "Bearer")
 	Claims      ClaimsConfig `mapstructure:"claims"`        // JWT claim field names
 }
 
@@ -74,12 +75,12 @@ type DevConfig struct {
 // ProxyConfig contains HTTP client transport and timeout configuration for reverse proxy operations.
 // These settings optimize connection pooling and request handling for high-throughput scenarios.
 type ProxyConfig struct {
-	RequestTimeout      time.Duration `mapstructure:"request_timeout"`       // Maximum request duration
-	IdleConnTimeout     time.Duration `mapstructure:"idle_conn_timeout"`     // Keep-alive duration for idle connections
-	TLSHandshakeTimeout time.Duration `mapstructure:"tls_handshake_timeout"` // Timeout for TLS handshake
-	MaxIdleConns        int           `mapstructure:"max_idle_conns"`        // Total idle connections across all upstreams
+	RequestTimeout      time.Duration `mapstructure:"request_timeout"`         // Maximum request duration
+	IdleConnTimeout     time.Duration `mapstructure:"idle_conn_timeout"`       // Keep-alive duration for idle connections
+	TLSHandshakeTimeout time.Duration `mapstructure:"tls_handshake_timeout"`   // Timeout for TLS handshake
+	MaxIdleConns        int           `mapstructure:"max_idle_conns"`          // Total idle connections across all upstreams
 	MaxIdleConnsPerHost int           `mapstructure:"max_idle_conns_per_host"` // Idle connections per upstream
-	ForceHTTP2          bool          `mapstructure:"force_http2"`           // Enable HTTP/2 when available
+	ForceHTTP2          bool          `mapstructure:"force_http2"`             // Enable HTTP/2 when available
 }
 
 type ThanosConfig struct {
@@ -354,6 +355,7 @@ func (a *App) migrateAuthConfig() {
 	if a.Cfg.Auth.Claims.Groups == "" {
 		a.Cfg.Auth.Claims.Groups = "groups"
 	}
+	a.Cfg.Auth.AuthScheme = strings.TrimSpace(a.Cfg.Auth.AuthScheme)
 
 	// Also maintain backward compatibility fields for existing code that still references them
 	// This allows gradual migration of code references
@@ -369,6 +371,7 @@ func (a *App) migrateAuthConfig() {
 		Str("username_claim", a.Cfg.Auth.Claims.Username).
 		Str("email_claim", a.Cfg.Auth.Claims.Email).
 		Str("groups_claim", a.Cfg.Auth.Claims.Groups).
+		Str("auth_scheme", a.Cfg.Auth.AuthScheme).
 		Msg("Authentication configuration loaded")
 }
 

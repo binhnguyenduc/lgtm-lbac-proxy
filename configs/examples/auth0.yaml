@@ -7,6 +7,7 @@ log:
 auth:
   jwks_cert_url: https://your-tenant.auth0.com/.well-known/jwks.json
   auth_header: "Authorization"
+  auth_scheme: "Bearer"
   claims:
     username: "nickname"                           # Auth0: nickname or name
     email: "email"                                 # Standard email claim

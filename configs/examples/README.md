@@ -17,6 +17,7 @@ Different OAuth providers use different claim names for user identity informatio
 
 ```yaml
 auth:
+  auth_scheme: "Bearer"           # Token prefix (use "" for raw tokens)
   claims:
     username: "preferred_username"  # JWT claim for username
     email: "email"                   # JWT claim for email
