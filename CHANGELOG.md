@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.5] - 2025-11-03
+
+### Changed
+
+- **Eager Parsing of Label Policies**:
+  - Parse all label policies during initialization instead of on-demand for zero first-request overhead
+  - Remove rawData field from FileLabelStore for ~50% memory reduction
+  - Simplify GetLabelPolicy() to pure cache lookup + merge operations
+  - Add fail-fast validation for invalid policies at startup
+  - Update cache strategy: `entry:name` for individuals, `merged:` for combinations
+  - Initialization: <0.5ms for 100 entries, all operations remain <5ms
+  - **Performance**: Zero first-request parsing latency, improved memory efficiency
+  - **Testing**: 76+ tests passing with comprehensive benchmarks in `labelstore_bench_test.go`
+  - **Documentation**: Enhanced architecture design principles in CLAUDE.md
+
 ## [0.15.4] - 2025-11-03
 
 ### Added

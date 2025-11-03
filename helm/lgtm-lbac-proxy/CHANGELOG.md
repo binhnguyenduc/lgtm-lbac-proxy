@@ -5,6 +5,14 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.3] - 2025-11-03
+
+### Changed
+
+- **AppVersion**: Updated to 0.15.5 to match proxy release with eager parsing optimization
+- **Chart Version**: Bumped to 1.12.3 (patch release)
+- **Performance**: Zero first-request overhead with pre-parsed label policies at startup
+
 ## [1.12.2] - 2025-11-03
 
 ### Removed
