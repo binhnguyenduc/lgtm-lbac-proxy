@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.3] - 2025-11-03
+
+### Fixed
+
+- **Case Sensitivity for Usernames and Groups in Labels Configuration**:
+  - Fixed bug where Viper's `Unmarshal()` function lowercased all username and group keys from `labels.yaml`
+  - Example: `GrafanaAdmin` was being converted to `grafanaadmin`, causing authentication failures
+  - Changed to use Viper's `AllSettings()` method which preserves the original case from YAML
+  - Now usernames and groups with any case combination (e.g., `GrafanaAdmin`, `BiNh.NgUyEn@EnCapital.io`) match exactly against JWT claims
+  - **Impact**: Users with mixed-case usernames in their JWT tokens can now authenticate properly
+
 ## [0.15.2] - 2025-11-03
 
 This release simplifies logging configuration by removing the confusing `LogTokens` config and using the standard log level instead. Now users set `level: -1` (trace) for development debugging with full headers and body logging.
