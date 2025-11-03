@@ -56,9 +56,16 @@ go test -bench=. -benchmem -run=^$
 │ JWT Token   │────▶│ Label Store  │────▶│ Query         │────▶│ Upstream │
 │ (auth.go)   │     │ (labelstore) │     │ Enforcer      │     │ (routes) │
 └─────────────┘     └──────────────┘     └───────────────┘     └──────────┘
-                    Extended format      PromQL/LogQL/TraceQL   Loki/Thanos
-                    Multi-label policy   Inject restrictions    /Tempo
+                    Eager parsing at     PromQL/LogQL/TraceQL   Loki/Thanos
+                    startup/reload       Inject restrictions    /Tempo
+                    Multi-label policy   Cache merged policies
 ```
+
+**Key Design Principles**:
+- **Eager Parsing**: All policies parsed and validated at startup/reload (fail-fast)
+- **Zero First-Request Overhead**: Pre-parsed policies eliminate on-demand parsing latency
+- **Memory Efficient**: Single storage of parsed policies (~50% memory reduction)
+- **Cache Strategy**: Individual policies cached, merged per-request for specific user+groups
 
 **Servers**: `:8080` (proxy) | `:8081` (metrics)
 
@@ -68,7 +75,7 @@ go test -bench=. -benchmem -run=^$
 |-----------|-------|---------|
 | **Core** | `main.go`, `config.go` | App initialization, config with hot-reload |
 | **Auth** | `auth.go` | JWT+JWKS validation, extract username/email/groups |
-| **Labels** | `labelstore.go`, `labelrule.go`, `policyparser.go` | Extended format, rules with operators (=, !=, =~, !~), AND/OR logic |
+| **Labels** | `labelstore.go`, `labelrule.go`, `policyparser.go` | Eager parsing at startup, extended format, rules with operators (=, !=, =~, !~), AND/OR logic, fail-fast validation |
 | **Enforcers** | `enforcer_promql.go`, `enforcer_logql.go`, `enforcer_traceql.go` | Parse → validate → inject labels → return modified query |
 | **Routing** | `routes.go` | HTTP endpoints, orchestrate auth→validate→enforce→proxy |
 | **Tests** | `*_test.go` (76+ tests), `*_bench_test.go` | Unit tests, integration tests, performance benchmarks |

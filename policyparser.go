@@ -85,8 +85,16 @@ func (p *PolicyParser) parseExtendedFormat(data RawLabelData, rulesData interfac
 	}
 
 	for i, ruleData := range rulesArray {
-		ruleMap, ok := ruleData.(map[string]interface{})
-		if !ok {
+		// Handle both map[string]interface{} and RawLabelData types
+		// RawLabelData is a type alias, so type assertion may fail even though underlying type matches
+		var ruleMap map[string]interface{}
+
+		switch v := ruleData.(type) {
+		case map[string]interface{}:
+			ruleMap = v
+		case RawLabelData:
+			ruleMap = map[string]interface{}(v)
+		default:
 			return nil, fmt.Errorf("rule %d: must be a map", i)
 		}
 

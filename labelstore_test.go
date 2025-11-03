@@ -122,17 +122,19 @@ MixedCase:
 				t.Fatalf("Failed to load labels: %v", err)
 			}
 
-			// Verify expected keys are present
+			// Verify expected keys are present in parsed policy cache
 			for _, expectedKey := range tt.expectedKeys {
-				if _, ok := store.rawData[expectedKey]; !ok {
-					t.Errorf("Expected key %q not found in rawData. Available keys: %v", expectedKey, mapKeys(store.rawData))
+				cacheKey := "entry:" + expectedKey
+				if _, ok := store.policyCache[cacheKey]; !ok {
+					t.Errorf("Expected key %q not found in policyCache. Available keys: %v", expectedKey, mapPolicyCacheKeys(store.policyCache))
 				}
 			}
 
 			// Verify unexpected keys are not present (i.e., case was lowercased)
 			for _, unexpectedKey := range tt.unexpectedKeys {
-				if _, ok := store.rawData[unexpectedKey]; ok {
-					t.Errorf("Unexpected key %q found in rawData (case was incorrectly modified). %s", unexpectedKey, tt.description)
+				cacheKey := "entry:" + unexpectedKey
+				if _, ok := store.policyCache[cacheKey]; ok {
+					t.Errorf("Unexpected key %q found in policyCache (case was incorrectly modified). %s", unexpectedKey, tt.description)
 				}
 			}
 		})
@@ -196,9 +198,10 @@ john.doe@example.com:
 	}
 
 	for key := range expectedKeys {
-		if _, ok := store.rawData[key]; !ok {
+		cacheKey := "entry:" + key
+		if _, ok := store.policyCache[cacheKey]; !ok {
 			t.Errorf("Expected key %q not found with correct case. Available keys: %v. "+
-				"This indicates case sensitivity was not preserved from YAML file.", key, mapKeys(store.rawData))
+				"This indicates case sensitivity was not preserved from YAML file.", key, mapPolicyCacheKeys(store.policyCache))
 		}
 	}
 
@@ -211,8 +214,9 @@ john.doe@example.com:
 	}
 
 	for _, key := range unexpectedLowercaseKeys {
-		if _, ok := store.rawData[key]; ok {
-			t.Errorf("Unexpected key %q found in rawData. Case was incorrectly modified "+
+		cacheKey := "entry:" + key
+		if _, ok := store.policyCache[cacheKey]; ok {
+			t.Errorf("Unexpected key %q found in policyCache. Case was incorrectly modified "+
 				"(old Viper behavior that we fixed).", key)
 		}
 	}
@@ -260,28 +264,28 @@ TESTUSER789:
 		t.Fatalf("Failed to load labels: %v", err)
 	}
 
-	// Verify all variations are present with correct case
-	if _, ok := store.rawData["testUser123"]; !ok {
+	// Verify all variations are present with correct case in parsed policy cache
+	if _, ok := store.policyCache["entry:testUser123"]; !ok {
 		t.Error("Expected key 'testUser123' not found in direct YAML parsing result")
 	}
-	if _, ok := store.rawData["TestUser456"]; !ok {
+	if _, ok := store.policyCache["entry:TestUser456"]; !ok {
 		t.Error("Expected key 'TestUser456' not found in direct YAML parsing result")
 	}
-	if _, ok := store.rawData["TESTUSER789"]; !ok {
+	if _, ok := store.policyCache["entry:TESTUSER789"]; !ok {
 		t.Error("Expected key 'TESTUSER789' not found in direct YAML parsing result")
 	}
 
 	// Verify that lowercased versions are NOT present (which would happen with Viper)
-	if _, ok := store.rawData["testuser456"]; ok {
+	if _, ok := store.policyCache["entry:testuser456"]; ok {
 		t.Error("Unexpected lowercased key 'testuser456' found (indicates case was modified by Viper)")
 	}
-	if _, ok := store.rawData["testuser789"]; ok {
+	if _, ok := store.policyCache["entry:testuser789"]; ok {
 		t.Error("Unexpected lowercased key 'testuser789' found (indicates case was modified by Viper)")
 	}
 }
 
-// Helper function to get map keys for debugging
-func mapKeys(m map[string]RawLabelData) []string {
+// Helper function to get policy cache keys for debugging
+func mapPolicyCacheKeys(m map[string]*LabelPolicy) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

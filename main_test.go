@@ -168,49 +168,63 @@ func setupTestMainWithPrivateKey() (App, map[string]string, *ecdsa.PrivateKey) {
 	app.Cfg.Thanos.URL = upstreamServer.URL
 	app.Cfg.Loki.URL = upstreamServer.URL
 
-	// Create a mock label store with extended format policies
+	// Create a mock label store with pre-parsed policies (eager parsing)
 	parser := NewPolicyParser()
-	cmh := FileLabelStore{
-		parser:      parser,
-		policyCache: make(map[string]*LabelPolicy),
-		rawData: map[string]RawLabelData{
-			"user": {
-				"_rules": []interface{}{
-					map[string]interface{}{
-						"name":     "tenant_id",
-						"operator": "=",
-						"values":   []interface{}{"allowed_user", "also_allowed_user"},
-					},
-				},
-			},
-			"group1": {
-				"_rules": []interface{}{
-					map[string]interface{}{
-						"name":     "tenant_id",
-						"operator": "=",
-						"values":   []interface{}{"allowed_group1", "also_allowed_group1"},
-					},
-				},
-			},
-			"group2": {
-				"_rules": []interface{}{
-					map[string]interface{}{
-						"name":     "tenant_id",
-						"operator": "=",
-						"values":   []interface{}{"allowed_group2", "also_allowed_group2"},
-					},
-				},
-			},
-			"admins": {
-				"_rules": []interface{}{
-					map[string]interface{}{
-						"name":     "tenant_id",
-						"operator": "=",
-						"values":   []interface{}{"admin_label"},
-					},
+	policyCache := make(map[string]*LabelPolicy)
+
+	// Pre-parse all policies as they would be during loadLabels()
+	rawData := map[string]RawLabelData{
+		"user": {
+			"_rules": []interface{}{
+				map[string]interface{}{
+					"name":     "tenant_id",
+					"operator": "=",
+					"values":   []interface{}{"allowed_user", "also_allowed_user"},
 				},
 			},
 		},
+		"group1": {
+			"_rules": []interface{}{
+				map[string]interface{}{
+					"name":     "tenant_id",
+					"operator": "=",
+					"values":   []interface{}{"allowed_group1", "also_allowed_group1"},
+				},
+			},
+		},
+		"group2": {
+			"_rules": []interface{}{
+				map[string]interface{}{
+					"name":     "tenant_id",
+					"operator": "=",
+					"values":   []interface{}{"allowed_group2", "also_allowed_group2"},
+				},
+			},
+		},
+		"admins": {
+			"_rules": []interface{}{
+				map[string]interface{}{
+					"name":     "tenant_id",
+					"operator": "=",
+					"values":   []interface{}{"admin_label"},
+				},
+			},
+		},
+	}
+
+	// Parse all policies eagerly
+	for key, data := range rawData {
+		policy, err := parser.ParseUserPolicy(data, "")
+		if err != nil {
+			log.Fatal().Err(err).Str("key", key).Msg("Failed to parse policy in test setup")
+		}
+		cacheKey := "entry:" + key
+		policyCache[cacheKey] = policy
+	}
+
+	cmh := FileLabelStore{
+		parser:      parser,
+		policyCache: policyCache,
 	}
 
 	app.LabelStore = &cmh
@@ -603,30 +617,43 @@ func TestLogAndWriteError(t *testing.T) {
 
 func TestGetLabelPolicyMerge(t *testing.T) {
 	parser := NewPolicyParser()
+	policyCache := make(map[string]*LabelPolicy)
 
-	store := FileLabelStore{
-		parser:      parser,
-		policyCache: make(map[string]*LabelPolicy),
-		rawData: map[string]RawLabelData{
-			"group1": {
-				"_rules": []interface{}{
-					map[string]interface{}{
-						"name":     "tenant_id",
-						"operator": "=",
-						"values":   []interface{}{"allowed_group1", "also_allowed_group1"},
-					},
-				},
-			},
-			"group2": {
-				"_rules": []interface{}{
-					map[string]interface{}{
-						"name":     "tenant_id",
-						"operator": "=",
-						"values":   []interface{}{"allowed_group2", "also_allowed_group2"},
-					},
+	// Pre-parse policies as they would be during loadLabels()
+	rawData := map[string]RawLabelData{
+		"group1": {
+			"_rules": []interface{}{
+				map[string]interface{}{
+					"name":     "tenant_id",
+					"operator": "=",
+					"values":   []interface{}{"allowed_group1", "also_allowed_group1"},
 				},
 			},
 		},
+		"group2": {
+			"_rules": []interface{}{
+				map[string]interface{}{
+					"name":     "tenant_id",
+					"operator": "=",
+					"values":   []interface{}{"allowed_group2", "also_allowed_group2"},
+				},
+			},
+		},
+	}
+
+	// Parse all policies eagerly
+	for key, data := range rawData {
+		policy, err := parser.ParseUserPolicy(data, "")
+		if err != nil {
+			log.Fatal().Err(err).Str("key", key).Msg("Failed to parse policy in test setup")
+		}
+		cacheKey := "entry:" + key
+		policyCache[cacheKey] = policy
+	}
+
+	store := FileLabelStore{
+		parser:      parser,
+		policyCache: policyCache,
 	}
 
 	// Simulate user with multiple groups

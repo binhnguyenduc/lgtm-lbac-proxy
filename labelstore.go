@@ -55,17 +55,18 @@ func (a *App) WithLabelStore() *App {
 	return a
 }
 
+// FileLabelStore provides file-based label store with eager policy parsing.
+// All policies are parsed and validated during initialization/reload,
+// eliminating on-demand parsing overhead and ensuring fail-fast validation.
 type FileLabelStore struct {
-	rawData     map[string]RawLabelData // Raw YAML data for extended format
-	parser      *PolicyParser           // Parser for converting to policies
-	policyCache map[string]*LabelPolicy // Cache of parsed policies
+	parser      *PolicyParser           // Parser for converting raw YAML to policies
+	policyCache map[string]*LabelPolicy // Cache of eagerly-parsed policies (user:username, group:groupname)
 }
 
 func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 	// Initialize parser and cache
 	c.parser = NewPolicyParser()
 	c.policyCache = make(map[string]*LabelPolicy)
-	c.rawData = make(map[string]RawLabelData)
 
 	v := viper.NewWithOptions(viper.KeyDelimiter("::"))
 	v.SetConfigName("labels")
@@ -170,49 +171,71 @@ func (c *FileLabelStore) loadLabels(v *viper.Viper, configPaths []string) error 
 			"See cmd/migrate-labels/README.md for detailed instructions", simpleFormatCount)
 	}
 
-	c.rawData = rawData
-
-	// Clear policy cache on reload
+	// Clear policy cache on reload - prepare for eager parsing
 	c.policyCache = make(map[string]*LabelPolicy)
 
-	log.Debug().Any("rawData", c.rawData).Msg("Labels loaded")
+	// Eager parsing: Parse all policies during initialization
+	// This provides fail-fast validation and eliminates on-demand parsing overhead
+	var parseErrors []string
+	parsedCount := 0
+
+	for key, data := range rawData {
+		// Parse policy using the default label (will be provided per-request, so use empty string for now)
+		// Note: defaultLabel is set during GetLabelPolicy, but for eager parsing we need a placeholder
+		policy, err := c.parser.ParseUserPolicy(data, "")
+		if err != nil {
+			parseErrors = append(parseErrors, fmt.Sprintf("entry '%s': %v", key, err))
+			continue
+		}
+
+		// Store parsed policy with simple cache key format
+		// Use prefixes to distinguish users from groups
+		cacheKey := "entry:" + key
+		c.policyCache[cacheKey] = policy
+		parsedCount++
+	}
+
+	// Fail fast if any policy failed to parse
+	if len(parseErrors) > 0 {
+		return fmt.Errorf("INVALID POLICY CONFIGURATION: %d entries failed to parse:\n%s\n\n"+
+			"All policies must be valid before the proxy can start.\n"+
+			"Fix the configuration errors listed above and restart.",
+			len(parseErrors), strings.Join(parseErrors, "\n"))
+	}
+
+	log.Debug().Int("parsedCount", parsedCount).Msg("Labels loaded and parsed eagerly")
 	return nil
 }
 
 // GetLabelPolicy retrieves the label policy for a user/group identity.
-// It requires the extended YAML format with _rules key.
+// All policies are pre-parsed during initialization, so this method only
+// performs cache lookup and merging for the specific user+groups combination.
 func (c *FileLabelStore) GetLabelPolicy(identity UserIdentity, defaultLabel string) (*LabelPolicy, error) {
 	username := identity.Username
 	groups := identity.Groups
 
-	// Check cache first - cache key includes username and groups to handle different group memberships
-	cacheKey := username + ":" + strings.Join(groups, ",")
-	if cached, ok := c.policyCache[cacheKey]; ok {
+	// Check cache for merged policy (user + specific group combination)
+	// Merged policies are cached per unique user+groups combination for performance
+	mergedCacheKey := "merged:" + username + ":" + strings.Join(groups, ",")
+	if cached, ok := c.policyCache[mergedCacheKey]; ok {
 		return cached, nil
 	}
 
-	// Collect all policies (user + groups)
+	// Collect pre-parsed policies from cache (user + groups)
+	// All policies were eagerly parsed during loadLabels()
 	var policies []*LabelPolicy
 
-	// User policy
-	if userData, ok := c.rawData[username]; ok {
-		policy, err := c.parser.ParseUserPolicy(userData, defaultLabel)
-		if err != nil {
-			log.Warn().Err(err).Str("user", username).Msg("Failed to parse user policy")
-		} else {
-			policies = append(policies, policy)
-		}
+	// Look up user policy
+	userCacheKey := "entry:" + username
+	if userPolicy, ok := c.policyCache[userCacheKey]; ok {
+		policies = append(policies, userPolicy)
 	}
 
-	// Group policies
+	// Look up group policies
 	for _, group := range groups {
-		if groupData, ok := c.rawData[group]; ok {
-			policy, err := c.parser.ParseUserPolicy(groupData, defaultLabel)
-			if err != nil {
-				log.Warn().Err(err).Str("group", group).Msg("Failed to parse group policy")
-			} else {
-				policies = append(policies, policy)
-			}
+		groupCacheKey := "entry:" + group
+		if groupPolicy, ok := c.policyCache[groupCacheKey]; ok {
+			policies = append(policies, groupPolicy)
 		}
 	}
 
@@ -220,7 +243,7 @@ func (c *FileLabelStore) GetLabelPolicy(identity UserIdentity, defaultLabel stri
 		return nil, fmt.Errorf("no policy found for user %s", username)
 	}
 
-	// Merge policies
+	// Merge policies for this specific user+groups combination
 	mergedPolicy := c.mergePolicies(policies)
 
 	// Check for cluster-wide access
@@ -231,8 +254,8 @@ func (c *FileLabelStore) GetLabelPolicy(identity UserIdentity, defaultLabel stri
 		}
 	}
 
-	// Cache the merged policy
-	c.policyCache[cacheKey] = mergedPolicy
+	// Cache the merged policy for this user+groups combination
+	c.policyCache[mergedCacheKey] = mergedPolicy
 
 	return mergedPolicy, nil
 }

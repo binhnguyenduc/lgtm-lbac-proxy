@@ -39,3 +39,4 @@ manual_verify_test.go
 extract_from_json.py
 TOKEN_*.md
 coverage.out
+.gocache/
