@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.4] - 2025-11-03
+
+### Added
+
+- **Comprehensive Unit Tests for Case Sensitivity in Label Store**:
+  - Added `labelstore_test.go` with extensive test coverage for YAML parsing and case preservation
+  - `TestFileLabelStoreLoadLabelsPreserveCase`: Tests case preservation across various scenarios:
+    - Mixed-case usernames (e.g., `GrafanaAdmin`)
+    - Email-style usernames with mixed case (e.g., `BiNh.NgUyEn@EnCapital.io`)
+    - Multiple groups with varying case combinations
+    - All case variations (UPPERCASE, lowercase, MixedCase)
+  - `TestFileLabelStoreMultipleUsersAndGroupsPreserveCase`: Validates case sensitivity with realistic YAML structures
+  - `TestFileLabelStoreDirectYAMLParsing`: Tests the new direct YAML parsing method that bypasses Viper normalization
+  - All 80+ tests pass validating that case is preserved exactly as specified in `labels.yaml`
+
 ## [0.15.3] - 2025-11-03
 
 ### Fixed
