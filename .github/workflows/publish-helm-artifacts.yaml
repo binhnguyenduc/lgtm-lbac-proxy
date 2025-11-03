@@ -141,9 +141,15 @@ jobs:
         working-directory: artifact-repo
         env:
           PACKAGE_PATH: ${{ steps.package.outputs.package_path }}
+          CHART_NAME: ${{ steps.package.outputs.chart_name }}
+          CHART_VERSION: ${{ steps.package.outputs.chart_version }}
         run: |
-          mkdir -p charts
-          cp "${GITHUB_WORKSPACE}/${PACKAGE_PATH}" charts/
+          # Copy chart to root of artifact repo
+          CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+          cp "${GITHUB_WORKSPACE}/${PACKAGE_PATH}" "${CHART_FILE}"
+
+          echo "Copied ${CHART_FILE} to artifact repository root"
+          ls -lh "${CHART_FILE}"
 
       - name: Update index.yaml
         shell: bash
@@ -151,11 +157,17 @@ jobs:
         env:
           HELM_REPO_URL: ${{ env.HELM_REPO_URL }}
         run: |
+          # Create empty index if it doesn't exist
           if [[ ! -f index.yaml || ! -s index.yaml ]]; then
             printf 'apiVersion: v1\nentries: {}\ngenerated: 1970-01-01T00:00:00Z\n' > index.yaml
           fi
-          helm repo index charts --url "${HELM_REPO_URL}" --merge index.yaml
-          mv charts/index.yaml index.yaml
+
+          # Generate new index (this will create a new index.yaml in current dir)
+          helm repo index . --url "${HELM_REPO_URL}" --merge index.yaml
+
+          echo "Updated index.yaml"
+          echo "Index entries:"
+          grep -A 2 "urls:" index.yaml || echo "No entries yet"
 
       - name: Commit and push artifacts
         working-directory: artifact-repo
@@ -165,13 +177,26 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add charts index.yaml
+
+          # Add chart package and index
+          CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+          git add "${CHART_FILE}" index.yaml
+
+          # Check if there are changes to commit
           if git diff --cached --quiet; then
             echo "No changes to publish."
             exit 0
           fi
+
+          # Show what's being committed
+          echo "Changes to be committed:"
+          git diff --cached --name-status
+
+          # Commit and push
           git commit -m "Publish ${CHART_NAME} ${CHART_VERSION}"
           git push origin main
+
+          echo "✅ Successfully published ${CHART_NAME} ${CHART_VERSION}"
 
       - name: Output published artifact metadata
         run: |
