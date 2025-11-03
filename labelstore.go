@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Labelstore defines the interface for retrieving tenant labels based on user identity.
@@ -79,7 +82,8 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 	}
 
 	// Load raw data for extended format support
-	err = c.loadLabels(v)
+	// We pass the config paths and viper instance to loadLabels
+	err = c.loadLabels(v, config.ConfigPaths)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error while loading label configuration")
 		return err
@@ -92,7 +96,7 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error while reloading config file")
 		}
-		err = c.loadLabels(v)
+		err = c.loadLabels(v, config.ConfigPaths)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Error while reloading label configuration")
 		}
@@ -104,17 +108,37 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 }
 
 // loadLabels loads label configuration from viper (extended format only)
-func (c *FileLabelStore) loadLabels(v *viper.Viper) error {
-	// Use AllSettings() to preserve case sensitivity of keys from YAML
-	// Viper's Unmarshal() lowercases keys by default, which breaks case-sensitive
-	// username/group matching. AllSettings() preserves the original case.
-	allSettings := v.AllSettings()
-	
-	rawData := make(map[string]RawLabelData)
-	for key, value := range allSettings {
-		if data, ok := value.(map[string]interface{}); ok {
-			rawData[key] = data
+// loadLabels loads label configuration from YAML file with case preservation
+// We read the YAML file directly instead of using Viper to parse it, because Viper
+// normalizes all keys to lowercase by design. Direct YAML parsing preserves the
+// original case of usernames and groups from the YAML file.
+func (c *FileLabelStore) loadLabels(v *viper.Viper, configPaths []string) error {
+	var yamlContent []byte
+	var err error
+	var filePath string
+
+	// Find and read the labels.yaml file from config paths
+	for _, path := range configPaths {
+		candidate := filepath.Join(path, "labels.yaml")
+		if _, err := os.Stat(candidate); err == nil {
+			filePath = candidate
+			yamlContent, err = os.ReadFile(candidate)
+			if err == nil {
+				break
+			}
 		}
+	}
+
+	if len(yamlContent) == 0 {
+		return fmt.Errorf("labels.yaml file not found in configured paths: %v", configPaths)
+	}
+
+	// Parse YAML directly to preserve case sensitivity
+	// Using gopkg.in/yaml.v3 which preserves key case unlike Viper
+	var rawData map[string]RawLabelData
+	err = yaml.Unmarshal(yamlContent, &rawData)
+	if err != nil {
+		return fmt.Errorf("error unmarshalling YAML from %s: %w", filePath, err)
 	}
 
 	// Validate format at startup - detect simple format early
