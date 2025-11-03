@@ -1,6 +1,5 @@
 log:
-  level: 1 # 0 - debug, 1 - info, 2 - warn, 3 - error, -1 trace (exposes sensitive data)
-  log_tokens: false # log tokens in debug mode
+  level: 1 # 0 - debug, 1 - info, 2 - warn, 3 - error, -1 - trace (logs all headers and body, exposes sensitive data)
 
 # Authentication configuration (recommended - new in v0.14.0)
 auth:
@@ -20,10 +19,6 @@ web:
   host: localhost # host to listen on
   tls_verify_skip: true # skip tls verification very insecurely!!!
   trusted_root_ca_path: "./certs/" # path to trusted root ca
-  # DEPRECATED: Move these to auth section above
-  # jwks_cert_url: https://sso.example.com/realms/internal/protocol/openid-connect/certs
-  # oauth_group_name: "groups"
-
 admin:
   bypass: true # enable admin bypass
   group: gepardec-run-admins # group name for admin bypass
@@ -51,7 +46,6 @@ dev:
 
 thanos:
   url: https://localhost:9091 # url to thanos querier
-  tenant_label: namespace # label to use for tenant
   cert: "./certs/thanos/tls.crt" # path to thanos mtls cert
   key: "./certs/thanos/tls.key" # path to thanos mtls key
   headers:
@@ -65,7 +59,6 @@ thanos:
 
 loki:
   url: https://localhost:3100 # url to loki querier
-  tenant_label: kubernetes_namespace_name # label to use for tenant
   cert: "./certs/loki/tls.crt" # path to loki mtls cert
   key: "./certs/loki/tls.key" # path to loki mtls key
   headers:
@@ -78,7 +71,6 @@ loki:
 
 tempo:
   url: https://localhost:3200 # url to tempo querier
-  tenant_label: resource.namespace # TraceQL attribute to use for tenant (e.g., resource.namespace, span.tenant.id)
   cert: "./certs/tempo/tls.crt" # path to tempo mtls cert
   key: "./certs/tempo/tls.key" # path to tempo mtls key
   headers:

@@ -5,6 +5,47 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2025-11-03
+
+### Removed
+
+- **Deprecated `log_tokens` Configuration**: Removed from Helm chart templates and values
+  - Simplified ConfigMap by removing `log.log_tokens: false`
+  - Use standard log level instead: `level: -1` for trace/debug logging
+
+### Changed
+
+- **AppVersion**: Updated to 0.15.2 to match proxy release with simplified logging
+- **Chart Version**: Bumped to 1.12.2 (patch release)
+- **Log Level Comment**: Enhanced Helm values comment to clarify trace level behavior
+  - Added explanation: `level: -1 - trace (logs all headers and body, exposes sensitive data)`
+- **Values Structure**: Restructured configuration paths (flattened hierarchy from proxy.* to root-level keys)
+  - Removed deprecated `tenantLabel` fields
+  - Added labels section for LBAC policy configuration
+
+### Migration
+
+**Log Configuration Update**:
+```yaml
+# Old (deprecated - still works but removed from Helm)
+log:
+  level: 0
+  log_tokens: true
+
+# New (use trace level instead)
+log:
+  level: -1  # Trace level for debugging
+```
+
+## [1.12.1] - 2025-11-03
+
+### Changed
+
+- **AppVersion**: Updated to 0.15.1 to match proxy release
+- **Chart Version**: Bumped to 1.12.1 (patch release)
+- **Removed**: `tenantLabel` fields from Thanos, Loki, and Tempo configuration
+- **Template Refactoring**: Updated reference paths in configmaps and deployment templates
+
 ## [1.12.0] - 2025-11-03
 
 ### Added

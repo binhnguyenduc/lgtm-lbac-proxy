@@ -84,32 +84,27 @@ auth:
 
 To verify your JWT claim configuration:
 
-1. **Enable debug logging:**
+1. **Enable trace logging to see token details:**
    ```yaml
    log:
-     level: 0  # Debug level
-     log_tokens: true  # Show token claims (development only!)
+     level: -1  # Trace level - logs all headers and body (development only!)
    ```
 
 2. **Send a test request** with a JWT token from your provider
 
-3. **Check the logs** for JWT claims extraction:
-   ```
-   INF JWT claims extracted username=alice@example.com email=alice@example.com groups=[team-a, team-b]
-   ```
+3. **Check the logs** for JWT claims extraction and request details
 
-4. **Disable token logging** in production:
+4. **Set back to appropriate level in production:**
    ```yaml
    log:
-     level: 1  # Info level
-     log_tokens: false
+     level: 1  # Info level (production)
    ```
 
 ## Troubleshooting
 
 ### Issue: "No username found in token"
 
-**Solution:** Check your `auth.claims.username` matches the actual claim in your JWT token. Use `log_tokens: true` to see available claims.
+**Solution:** Check your `auth.claims.username` matches the actual claim in your JWT token. Use `level: -1` (trace) to see available claims in logs.
 
 ### Issue: "No groups found in token"
 

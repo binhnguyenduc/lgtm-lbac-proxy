@@ -99,7 +99,6 @@ func (a *App) WithLoki() *App {
 		log.Trace().Any("route", route).Msg("Loki route")
 		lokiRouter.HandleFunc(route.Url, handlerWithProxy(route.MatchWord,
 			LogQLEnforcer(struct{}{}),
-			a.Cfg.Loki.TenantLabel,
 			a.lokiProxy,
 			proxyCfg,
 			a.Cfg.Loki.UseMutualTLS,
@@ -143,7 +142,6 @@ func (a *App) WithTempo() *App {
 		log.Trace().Any("route", route).Msg("Tempo route")
 		tempoRouter.HandleFunc(route.Url, handlerWithProxy(route.MatchWord,
 			TraceQLEnforcer(struct{}{}),
-			a.Cfg.Tempo.TenantLabel,
 			a.tempoProxy,
 			proxyCfg,
 			a.Cfg.Tempo.UseMutualTLS,
@@ -196,7 +194,6 @@ func (a *App) WithThanos() *App {
 		thanosRouter.HandleFunc(route.Url,
 			handlerWithProxy(route.MatchWord,
 				PromQLEnforcer(struct{}{}),
-				a.Cfg.Thanos.TenantLabel,
 				a.thanosProxy,
 				proxyCfg,
 				a.Cfg.Thanos.UseMutualTLS,
@@ -213,7 +210,7 @@ func (a *App) WithThanos() *App {
 //
 // This function uses pre-created proxy instances for better performance through connection
 // reuse and per-upstream configuration. Request timeouts are enforced using context deadlines.
-func handlerWithProxy(matchWord string, enforcer EnforceQL, tl string, proxy *httputil.ReverseProxy, proxyCfg ProxyConfig, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
+func handlerWithProxy(matchWord string, enforcer EnforceQL, proxy *httputil.ReverseProxy, proxyCfg ProxyConfig, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Create timeout context for the request
 		ctx, cancel := context.WithTimeout(r.Context(), proxyCfg.RequestTimeout)
@@ -227,7 +224,7 @@ func handlerWithProxy(matchWord string, enforcer EnforceQL, tl string, proxy *ht
 		}
 
 		// Policy-based enforcement (only method supported)
-		policy, skip, err := validateLabelPolicy(oauthToken, tl, a)
+		policy, skip, err := validateLabelPolicy(oauthToken, a)
 		if err != nil {
 			logAndWriteError(w, http.StatusForbidden, err, "")
 			return
@@ -259,7 +256,7 @@ func handlerWithProxy(matchWord string, enforcer EnforceQL, tl string, proxy *ht
 // authentication, conditional enforcement, and forwarding to the upstream server.
 // This is the legacy handler kept for backward compatibility during migration.
 // DEPRECATED: Use handlerWithProxy instead for better performance.
-func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
+func handler(matchWord string, enforcer EnforceQL, dsURL string, tls bool, headers map[string]string, a *App) func(http.ResponseWriter, *http.Request) {
 	upstreamURL, err := url.Parse(dsURL)
 	if err != nil {
 		log.Fatal().Err(err).Str("url", dsURL).Msg("Error parsing URL")
@@ -271,7 +268,7 @@ func handler(matchWord string, enforcer EnforceQL, tl string, dsURL string, tls 
 		}
 
 		// Policy-based enforcement (only method supported)
-		policy, skip, err := validateLabelPolicy(oauthToken, tl, a)
+		policy, skip, err := validateLabelPolicy(oauthToken, a)
 		if err != nil {
 			logAndWriteError(w, http.StatusForbidden, err, "")
 			return

@@ -5,6 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] - 2025-11-03
+
+This release simplifies logging configuration by removing the confusing `LogTokens` config and using the standard log level instead. Now users set `level: -1` (trace) for development debugging with full headers and body logging.
+
+### Removed
+
+- **Deprecated `LogTokens` Configuration**:
+  - Removed `log.log_tokens` boolean configuration field
+  - Removes confusion between two different logging controls (`log.level` and `log.log_tokens`)
+  - Simplifies configuration and aligns with standard logging patterns
+
+### Changed
+
+- **Log Level-Based Control**:
+  - Log level `-1` (trace) now logs all request headers and body for debugging
+  - Other log levels redact sensitive headers (Authorization, X-Plugin-Id, X-Id-Token) and body
+  - Uses standard log level semantics: trace = most verbose for development
+
+- **Logging Middleware** (`log.go`):
+  - Updated `loggingMiddleware()` to check `level == -1` instead of `LogTokens` boolean
+  - Updated `logRequestData()` to accept boolean based on trace level
+  - Clearer comments explaining behavior at trace vs other levels
+
+- **Configuration Files**:
+  - Updated `configs/config.yaml` to remove `log_tokens` line
+  - Updated `configs/examples/README.md` with trace level guidance
+  - Updated all provider examples to remove `log_tokens` references
+
+### Migration
+
+**Before**:
+```yaml
+log:
+  level: 0  # 0 - debug
+  log_tokens: true  # Show token claims (confusing!)
+```
+
+**After**:
+```yaml
+log:
+  level: -1  # -1 - trace (logs all headers and body for debugging)
+```
+
+Or for production:
+```yaml
+log:
+  level: 1  # 1 - info (redacts sensitive headers and body)
+```
+
+## [0.15.1] - 2025-11-03
+
+This release removes the unused `tenant_label` configuration parameter that was deprecated in the extended label format (v0.12.0+). Users now explicitly define label names in their label policies, eliminating the need for this configuration.
+
+### Removed
+
+- **Deprecated `tenant_label` Configuration**:
+  - Removed `tenant_label` from Thanos, Loki, and Tempo configuration structures
+  - Parameter was unused in extended label format where users explicitly specify label names in `_rules`
+  - Simplifies configuration and reduces unnecessary parameters
+  - Affects config files, Helm values, and all example configurations
+
+### Changed
+
+- **Route Handlers**: Updated `handlerWithProxy()` and legacy `handler()` functions to remove `tenant_label` parameter passing
+- **Helm Configuration**: Removed `tenantLabel` fields from Thanos, Loki, and Tempo sections
+- **Label Validation**: Simplified `validateLabelPolicy()` to remove unused `defaultLabel` parameter
+
+### Migration
+
+**Breaking Change**: Users with old config files containing `tenant_label` must remove these lines:
+```yaml
+# Remove these lines - no longer supported
+thanos:
+  tenant_label: namespace
+
+loki:
+  tenant_label: kubernetes_namespace_name
+
+tempo:
+  tenant_label: resource.namespace
+```
+
+Since extended format requires explicit label names in policies, this parameter is not needed:
+```yaml
+# Label policy now explicitly defines label names
+user1:
+  _rules:
+    - name: namespace           # Label name defined here
+      operator: "="
+      values: ["prod", "staging"]
+  _logic: AND
+```
+
 ## [0.15.0] - 2025-11-03
 
 This release introduces a configurable authentication scheme so deployments can consume JWT tokens that are prefixed with non-Bearer keywords or have no prefix at all.

@@ -17,8 +17,7 @@ import (
 )
 
 type LogConfig struct {
-	Level     int  `mapstructure:"level"`
-	LogTokens bool `mapstructure:"log_tokens"`
+	Level int `mapstructure:"level"`
 }
 
 // ClaimsConfig defines the JWT claim field names to extract from tokens.
@@ -85,7 +84,6 @@ type ProxyConfig struct {
 
 type ThanosConfig struct {
 	URL          string            `mapstructure:"url"`
-	TenantLabel  string            `mapstructure:"tenant_label"`
 	UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
 	Cert         string            `mapstructure:"cert"`
 	Key          string            `mapstructure:"key"`
@@ -96,7 +94,6 @@ type ThanosConfig struct {
 
 type LokiConfig struct {
 	URL          string            `mapstructure:"url"`
-	TenantLabel  string            `mapstructure:"tenant_label"`
 	UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
 	Cert         string            `mapstructure:"cert"`
 	Key          string            `mapstructure:"key"`
@@ -107,7 +104,6 @@ type LokiConfig struct {
 
 type TempoConfig struct {
 	URL          string            `mapstructure:"url"`
-	TenantLabel  string            `mapstructure:"tenant_label"`
 	UseMutualTLS bool              `mapstructure:"use_mutual_tls"`
 	Cert         string            `mapstructure:"cert"`
 	Key          string            `mapstructure:"key"`
@@ -387,23 +383,6 @@ func (a *App) validateTempoConfig() {
 		log.Warn().Str("url", a.Cfg.Tempo.URL).Msg("Tempo URL should start with http:// or https://")
 	}
 
-	// Validate tenant_label format (TraceQL attributes must start with scope prefix)
-	if a.Cfg.Tempo.TenantLabel != "" {
-		validPrefixes := []string{"resource.", "span.", "event.", "link.", "."}
-		hasValidPrefix := false
-		for _, prefix := range validPrefixes {
-			if strings.HasPrefix(a.Cfg.Tempo.TenantLabel, prefix) {
-				hasValidPrefix = true
-				break
-			}
-		}
-		if !hasValidPrefix {
-			log.Warn().
-				Str("tenant_label", a.Cfg.Tempo.TenantLabel).
-				Msg("Tempo tenant_label should start with resource., span., event., link., or . (for intrinsic attributes)")
-		}
-	}
-
 	// Validate certificate files exist if mTLS is enabled
 	if a.Cfg.Tempo.UseMutualTLS {
 		if a.Cfg.Tempo.Cert != "" {
@@ -420,9 +399,8 @@ func (a *App) validateTempoConfig() {
 
 	log.Debug().
 		Str("url", a.Cfg.Tempo.URL).
-		Str("tenant_label", a.Cfg.Tempo.TenantLabel).
 		Bool("use_mutual_tls", a.Cfg.Tempo.UseMutualTLS).
-		Msg("Tempo configuration validated")
+		Msg("Tempo configuration loaded")
 }
 
 // GetProxyConfig merges upstream-specific proxy configuration with global defaults.

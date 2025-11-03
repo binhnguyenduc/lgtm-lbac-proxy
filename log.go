@@ -18,18 +18,18 @@ type requestData struct {
 }
 
 // loggingMiddleware returns a middleware that logs details of incoming HTTP requests and passes control to the next HTTP handler in the chain.
-// If configuration allows for logging tokens, the request body is read and logged.
-// Otherwise, the body content is redacted.
+// If trace level is enabled (level == -1), the request body is read and logged with all headers.
+// Otherwise, the body content is redacted and sensitive headers are removed.
 func (a *App) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var bodyBytes []byte
-		if a.Cfg.Log.LogTokens {
+		isTraceLevel := a.Cfg.Log.Level == -1
+		if isTraceLevel {
 			bodyBytes = readBody(r)
 		} else {
 			bodyBytes = []byte("[REDACTED]")
 		}
-		// log.Trace().Any("Request", r.Headers).Msg("")
-		logRequestData(r, bodyBytes, a.Cfg.Log.LogTokens)
+		logRequestData(r, bodyBytes, isTraceLevel)
 		next.ServeHTTP(w, r)
 		log.Debug().Str("path", r.URL.Path).Msg("Request complete")
 	})
@@ -53,11 +53,12 @@ func readBody(r *http.Request) []byte {
 }
 
 // logRequestData logs the specified request's details, including method, headers, and optionally, body content.
-// If logToken is false, sensitive headers are cleaned before logging.
+// If isTraceLevel is true (log level == -1), all headers and body are logged.
+// Otherwise, sensitive headers are cleaned and body is redacted for security.
 // If the request data cannot be marshaled to JSON, an error is logged.
-func logRequestData(r *http.Request, bodyBytes []byte, logToken bool) {
+func logRequestData(r *http.Request, bodyBytes []byte, isTraceLevel bool) {
 	rd := requestData{r.Method, r.URL.String(), r.Header, string(bodyBytes)}
-	if logToken {
+	if !isTraceLevel {
 		rd.Header = cleanSensitiveHeaders(rd.Header)
 	}
 	jsonData, err := json.Marshal(rd)

@@ -1,119 +1,132 @@
-proxy:
-  log:
-    level: 1 # 0 - debug, 1 - info, 2 - warn, 3 - error, -1 trace (exposes sensitive data)
-  admin:
-    bypass: false # enable admin bypass
-    group: gepardec-run-admins # group name for admin bypass
-  # Global proxy configuration (optional - sensible defaults if not specified)
-  # These settings optimize HTTP client transport for high-throughput reverse proxy operations
-  # Configuration precedence: upstream-specific > global > built-in defaults
-  proxyConfig:
-    requestTimeout: 60s          # Maximum request duration (default: 60s)
-    idleConnTimeout: 90s         # Keep-alive duration for idle connections (default: 90s)
-    tlsHandshakeTimeout: 10s     # Timeout for TLS handshake (default: 10s)
-    maxIdleConns: 500            # Total idle connections across all upstreams (default: 500)
-    maxIdleConnsPerHost: 100     # Idle connections per upstream (default: 100)
-    forceHTTP2: true             # Enable HTTP/2 when available (default: true)
-  thanos:
-    url: https://thanos-querier.monitoring.svc.cluster.local:9091
-    tenantLabel: namespace  # Default label name (used in extended format _rules)
-    # Per-upstream proxy configuration (optional - overrides global defaults)
-    # Uncomment to customize Thanos-specific timeouts and connection pooling
-    # proxy:
-    #   requestTimeout: 60s          # Override: Thanos query timeout
-    #   maxIdleConnsPerHost: 100     # Override: Connection pool size for Thanos
-  loki:
-    url: https://loki-query-frontend-http.logging.svc.cluster.local:3100
-    tenantLabel: kubernetes_namespace_name  # Default label name (used in extended format _rules)
-    actorHeader: X-Loki-Actor-Path
-    headers:
-      X-Scope-OrgID: application
-    # Per-upstream proxy configuration (optional - overrides global defaults)
-    # Example: Loki may need longer timeout for log queries and higher connection pool
-    # proxy:
-    #   requestTimeout: 120s         # Override: Loki queries can be slow
-    #   maxIdleConnsPerHost: 150     # Override: High log volume needs more connections
-  tempo:
-    url: https://tempo-query-frontend.tracing.svc.cluster.local:3200
-    tenantLabel: resource.namespace  # Default label name (used in extended format _rules)
-    actorHeader: ""
-    headers: {}
-    # Per-upstream proxy configuration (optional - overrides global defaults)
-    # Example: Tempo trace queries may need longer timeout but fewer connections
-    # proxy:
-    #   requestTimeout: 300s         # Override: Trace queries need longer timeout
-    #   maxIdleConnsPerHost: 50      # Override: Lower volume, fewer connections needed
-  alert:
-    enabled: false # enable alerting
-    tokenHeader: X-LGTM-Alert # header to use for the token
-    certUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
-    cert: '' # local jwks cert
-  # Authentication configuration (recommended - new in v0.14.0)
-  auth:
-    jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
-    authHeader: "Authorization"
-    authScheme: "Bearer" # authentication scheme/prefix (set to "" for raw token)
-    claims:
-      username: "preferred_username"  # JWT claim for username (default: preferred_username)
-      email: "email"                   # JWT claim for email (default: email)
-      groups: "groups"                 # JWT claim for groups (default: groups)
-    # Common OAuth Provider Examples:
-    # Keycloak: username=preferred_username, email=email, groups=groups
-    # Azure AD: username=unique_name, email=upn, groups=roles
-    # Auth0: username=nickname, email=email, groups=https://domain.com/groups
-    # Google: username=email, email=email, groups=hd
+log:
+  level: 1 # 0 - debug, 1 - info, 2 - warn, 3 - error, -1 - trace (logs all headers and body, exposes sensitive data)
 
-  # Legacy web configuration (deprecated - use auth section above)
-  # These fields are maintained for backward compatibility but will be removed in a future release
-  web:
-    oauthGroupName: "groups"  # DEPRECATED: Use auth.claims.groups instead
-    jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs  # DEPRECATED: Use auth.jwksCertUrl instead
-    tlsVerifySkip: false # skip tls verification very insecurely!!!
-  labelStore:
-    configPaths: # paths to search for label configuration files
-      - /etc/config/labels/ # Kubernetes ConfigMap mount path
-      - ./configs # Local development path
-    # Label Store Format (v0.12.0+):
-    # ONLY extended format is supported. Simple format was removed in v0.12.0.
-    #
-    # Extended Format - Multi-label policies with operators:
-    #   user1:
-    #     _rules:
-    #       - name: namespace
-    #         operator: "="
-    #         values: ["prod", "staging"]
-    #       - name: team
-    #         operator: "=~"
-    #         values: ["backend.*"]
-    #     _logic: AND  # Combine rules with AND or OR
-    #
-    #   # Admin with cluster-wide access
-    #   admin-group:
-    #     _rules:
-    #       - name: '#cluster-wide'
-    #         operator: "="
-    #         values: ["true"]
-    #     _logic: AND
-    #
-    # Supported operators: "=" (equals), "!=" (not equals), "=~" (regex), "!~" (negative regex)
-    # Supported logic: AND (default), OR
-    #
-    # Migration from simple format:
-    # Use the migration tool (./cmd/migrate-labels) to convert old format to extended format.
-    # See UPGRADE.md for detailed migration instructions.
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 65534
-    fsGroup: 65534
-    seccompProfile:
-      type: RuntimeDefault
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    capabilities:
-      drop:
-        - ALL
-  topologySpreadConstraints: []
+admin:
+  bypass: false # enable admin bypass
+  group: gepardec-run-admins # group name for admin bypass
+
+# Global proxy configuration (optional - sensible defaults if not specified)
+# These settings optimize HTTP client transport for high-throughput reverse proxy operations
+# Configuration precedence: upstream-specific > global > built-in defaults
+proxyConfig:
+  requestTimeout: 60s          # Maximum request duration (default: 60s)
+  idleConnTimeout: 90s         # Keep-alive duration for idle connections (default: 90s)
+  tlsHandshakeTimeout: 10s     # Timeout for TLS handshake (default: 10s)
+  maxIdleConns: 500            # Total idle connections across all upstreams (default: 500)
+  maxIdleConnsPerHost: 100     # Idle connections per upstream (default: 100)
+  forceHTTP2: true             # Enable HTTP/2 when available (default: true)
+
+thanos:
+  url: https://thanos-querier.monitoring.svc.cluster.local:9091
+  # Per-upstream proxy configuration (optional - overrides global defaults)
+  # Uncomment to customize Thanos-specific timeouts and connection pooling
+  # proxy:
+  #   requestTimeout: 60s          # Override: Thanos query timeout
+  #   maxIdleConnsPerHost: 100     # Override: Connection pool size for Thanos
+
+loki:
+  url: https://loki-query-frontend-http.logging.svc.cluster.local:3100
+  actorHeader: X-Loki-Actor-Path
+  headers:
+    X-Scope-OrgID: application
+  # Per-upstream proxy configuration (optional - overrides global defaults)
+  # Example: Loki may need longer timeout for log queries and higher connection pool
+  # proxy:
+  #   requestTimeout: 120s         # Override: Loki queries can be slow
+  #   maxIdleConnsPerHost: 150     # Override: High log volume needs more connections
+
+tempo:
+  url: https://tempo-query-frontend.tracing.svc.cluster.local:3200
+  actorHeader: ""
+  headers: {}
+  # Per-upstream proxy configuration (optional - overrides global defaults)
+  # Example: Tempo trace queries may need longer timeout but fewer connections
+  # proxy:
+  #   requestTimeout: 300s         # Override: Trace queries need longer timeout
+  #   maxIdleConnsPerHost: 50      # Override: Lower volume, fewer connections needed
+
+alert:
+  enabled: false # enable alerting
+  tokenHeader: X-LGTM-Alert # header to use for the token
+  certUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
+  cert: '' # local jwks cert
+
+# Authentication configuration (recommended - new in v0.14.0)
+auth:
+  jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs
+  authHeader: "Authorization"
+  authScheme: "" # authentication scheme/prefix (set to "" for raw token)
+  claims:
+    username: "preferred_username"  # JWT claim for username (default: preferred_username)
+    email: "email"                   # JWT claim for email (default: email)
+    groups: "groups"                 # JWT claim for groups (default: groups)
+  # Common OAuth Provider Examples:
+  # Keycloak: username=preferred_username, email=email, groups=groups
+  # Azure AD: username=unique_name, email=upn, groups=roles
+  # Auth0: username=nickname, email=email, groups=https://domain.com/groups
+  # Google: username=email, email=email, groups=hd
+
+# Legacy web configuration (deprecated - use auth section above)
+# These fields are maintained for backward compatibility but will be removed in a future release
+web:
+  oauthGroupName: "groups"  # DEPRECATED: Use auth.claims.groups instead
+  jwksCertUrl: https://sso.play.run.gepardec.com/realms/internal/protocol/openid-connect/certs  # DEPRECATED: Use auth.jwksCertUrl instead
+  tlsVerifySkip: false # skip tls verification very insecurely!!!
+
+labelStore:
+  configPaths: # paths to search for label configuration files
+    - /etc/config/labels/ # Kubernetes ConfigMap mount path
+    - ./configs # Local development path
+
+# Label-based access control policies (extended format v0.12.0+)
+# Uncomment and configure to enable label-based access control
+# This generates a labels.yaml ConfigMap if configured
+labels: {}
+  # Example single-label: namespace only
+  # user1:
+  #   _rules:
+  #     - name: namespace
+  #       operator: "="
+  #       values: ["prod", "staging"]
+  #   _logic: AND
+  #
+  # Example multi-label: namespace AND team
+  # user2:
+  #   _rules:
+  #     - name: namespace
+  #       operator: "="
+  #       values: ["prod"]
+  #     - name: team
+  #       operator: "=~"
+  #       values: ["backend.*"]
+  #   _logic: AND
+  #
+  # Example admin with cluster-wide access
+  # admin-group:
+  #   _rules:
+  #     - name: '#cluster-wide'
+  #       operator: "="
+  #       values: ["true"]
+  #   _logic: AND
+  #
+  # Supported operators: "=" (equals), "!=" (not equals), "=~" (regex), "!~" (negative regex)
+  # Supported logic: AND (default), OR
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+topologySpreadConstraints: []
 
 replicas: 1
 
@@ -136,7 +149,7 @@ service:
 
 tls:
   loki:
-    enabled: true # enable mTLS for loki
+    enabled: false # enable mTLS for loki
     secretName: loki-query-frontend-http # name of the secret
     cert: tls.crt
     key: tls.key
@@ -168,34 +181,8 @@ serviceAccount:
 
 resources:
   requests:
-    cpu: 50m
-    memory: 64Mi
+    cpu: 100m        # Increased from 50m for stable performance
+    memory: 512Mi    # Increased from 64Mi to handle request buffering and label caching
   limits:
-    cpu: 200m
-    memory: 128Mi
-
-# Label Migration Job
-# Optional Kubernetes Job to migrate labels from simple to extended format
-migration:
-  enabled: false  # Enable to run migration job
-  dryRun: true    # Set to false to actually perform migration
-  defaultLabel: namespace  # Default label name for conversion
-  labelsConfigMap: ""  # Override labels ConfigMap name (default: <release>-labels)
-
-  # Helm hook configuration
-  hookType: pre-upgrade  # Run before upgrade (or: pre-install, post-install, manual)
-  hookWeight: "-5"       # Hook execution order
-  hookDeletePolicy: before-hook-creation  # Delete old job before creating new one
-
-  # Job configuration
-  backoffLimit: 3
-  restartPolicy: Never
-
-  # Resource limits for migration job
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
+    cpu: 500m        # Increased from 200m to handle traffic spikes
+    memory: 1Gi      # Increased from 128Mi for label validation overhead and concurrent requests

@@ -167,8 +167,6 @@ func setupTestMainWithPrivateKey() (App, map[string]string, *ecdsa.PrivateKey) {
 	// defer upstreamServer.Close()
 	app.Cfg.Thanos.URL = upstreamServer.URL
 	app.Cfg.Loki.URL = upstreamServer.URL
-	app.Cfg.Thanos.TenantLabel = "tenant_id"
-	app.Cfg.Loki.TenantLabel = "tenant_id"
 
 	// Create a mock label store with extended format policies
 	parser := NewPolicyParser()

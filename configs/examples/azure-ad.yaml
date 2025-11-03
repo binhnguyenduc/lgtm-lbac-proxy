@@ -19,15 +19,12 @@ admin:
 
 thanos:
   url: "https://thanos-querier:9091"
-  tenant_label: "namespace"
 
 loki:
   url: "https://loki-query-frontend:3100"
-  tenant_label: "kubernetes_namespace_name"
 
 tempo:
   url: "https://tempo-query-frontend:3200"
-  tenant_label: "resource.namespace"
 
 labelstore:
   config_paths:

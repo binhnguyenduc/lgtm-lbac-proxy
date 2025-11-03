@@ -8,81 +8,90 @@ metadata:
 data:
   config.yaml: |-
     log:
-      level: {{ .Values.proxy.log.level }}
-      log_tokens: false
+      level: {{ .Values.log.level }}
 
-    {{- if .Values.proxy.auth }}
+    {{- if .Values.auth }}
     # New auth configuration (v0.14.0+)
     auth:
-      jwks_cert_url: {{ .Values.proxy.auth.jwksCertUrl | default .Values.proxy.web.jwksCertUrl }}
-      auth_header: {{ .Values.proxy.auth.authHeader | default "Authorization" }}
-      auth_scheme: {{ ( .Values.proxy.auth.authScheme | default "Bearer" ) | quote }}
+      jwks_cert_url: {{ .Values.auth.jwksCertUrl | default .Values.web.jwksCertUrl }}
+      auth_header: {{ .Values.auth.authHeader | default "Authorization" }}
+      auth_scheme: {{ ( .Values.auth.authScheme | default "" ) | quote }}
       claims:
-        username: {{ .Values.proxy.auth.claims.username | default "preferred_username" }}
-        email: {{ .Values.proxy.auth.claims.email | default "email" }}
-        groups: {{ .Values.proxy.auth.claims.groups | default .Values.proxy.web.oauthGroupName | default "groups" }}
+        username: {{ .Values.auth.claims.username | default "preferred_username" }}
+        email: {{ .Values.auth.claims.email | default "email" }}
+        groups: {{ .Values.auth.claims.groups | default .Values.web.oauthGroupName | default "groups" }}
     {{- end }}
 
     web:
       proxy_port: {{ .Values.service.webPort }}
       metrics_port: {{ .Values.service.metricsPort }}
       host: "0.0.0.0"
-      tls_verify_skip: {{ .Values.proxy.web.tlsVerifySkip}}
+      tls_verify_skip: {{ .Values.web.tlsVerifySkip}}
       trusted_root_ca_path: "/etc/secrets/ca"
-      {{- if not .Values.proxy.auth }}
+      {{- if not .Values.auth }}
       # Legacy auth configuration (deprecated)
-      jwks_cert_url: {{ .Values.proxy.web.jwksCertUrl }}
-      oauth_group_name: {{ .Values.proxy.web.oauthGroupName }}
+      jwks_cert_url: {{ .Values.web.jwksCertUrl }}
+      oauth_group_name: {{ .Values.web.oauthGroupName }}
       {{- end }}
 
     admin:
-      bypass: {{ .Values.proxy.admin.bypass }}
-      group: {{ .Values.proxy.admin.group }}
+      bypass: {{ .Values.admin.bypass }}
+      group: {{ .Values.admin.group }}
 
     alert:
-      enabled: {{ .Values.proxy.alert.enabled }}
-      token_header: {{ .Values.proxy.alert.tokenHeader }}
-      alert_cert_url: {{ .Values.proxy.alert.certUrl }}
-      alert_cert: {{ .Values.proxy.alert.cert | quote }}
+      enabled: {{ .Values.alert.enabled }}
+      token_header: {{ .Values.alert.tokenHeader }}
+      alert_cert_url: {{ .Values.alert.certUrl }}
+      alert_cert: {{ .Values.alert.cert | quote }}
 
     thanos:
-      url: {{ .Values.proxy.thanos.url }}
-      tenant_label: {{ .Values.proxy.thanos.tenantLabel }}
+      url: {{ .Values.thanos.url }}
       use_mutual_tls: {{ .Values.tls.thanos.enabled }}
       cert: "/etc/secrets/ca/thanos/{{ .Values.tls.thanos.cert }}"
       key: "/etc/secrets/ca/thanos/{{ .Values.tls.thanos.key }}"
-      actor_header: {{ .Values.proxy.thanos.actorHeader }}
+      actor_header: {{ .Values.thanos.actorHeader }}
       headers:
-        {{- range $key, $value := .Values.proxy.thanos.headers }}
+        {{- range $key, $value := .Values.thanos.headers }}
         {{ $key }}: {{ $value }}
         {{- end }}
 
     loki:
-      url: {{ .Values.proxy.loki.url }}
-      tenant_label: {{ .Values.proxy.loki.tenantLabel }}
+      url: {{ .Values.loki.url }}
       use_mutual_tls: {{ .Values.tls.loki.enabled }}
       cert: "/etc/secrets/ca/loki/{{ .Values.tls.loki.cert }}"
       key: "/etc/secrets/ca/loki/{{ .Values.tls.loki.key }}"
-      actor_header: {{ .Values.proxy.loki.actorHeader }}
+      actor_header: {{ .Values.loki.actorHeader }}
       headers:
-        {{- range $key, $value := .Values.proxy.loki.headers }}
+        {{- range $key, $value := .Values.loki.headers }}
         {{ $key }}: {{ $value }}
         {{- end }}
 
     tempo:
-      url: {{ .Values.proxy.tempo.url }}
-      tenant_label: {{ .Values.proxy.tempo.tenantLabel }}
+      url: {{ .Values.tempo.url }}
       use_mutual_tls: {{ .Values.tls.tempo.enabled }}
       cert: "/etc/secrets/ca/tempo/{{ .Values.tls.tempo.cert }}"
       key: "/etc/secrets/ca/tempo/{{ .Values.tls.tempo.key }}"
-      actor_header: {{ .Values.proxy.tempo.actorHeader }}
+      actor_header: {{ .Values.tempo.actorHeader }}
       headers:
-        {{- range $key, $value := .Values.proxy.tempo.headers }}
+        {{- range $key, $value := .Values.tempo.headers }}
         {{ $key }}: {{ $value }}
         {{- end }}
 
     labelstore:
       config_paths:
-        {{- range .Values.proxy.labelStore.configPaths }}
+        {{- range .Values.labelStore.configPaths }}
         - {{ . }}
         {{- end }}
+---
+{{- if .Values.labels }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lgtm-lbac-proxy.name" . }}-labels
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "lgtm-lbac-proxy.labels" . | nindent 4 }}
+data:
+  labels.yaml: |-
+    {{- toYaml .Values.labels | nindent 4 }}
+{{- end }}
