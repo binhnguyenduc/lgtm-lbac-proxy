@@ -105,10 +105,16 @@ func (c *FileLabelStore) Connect(config LabelStoreConfig) error {
 
 // loadLabels loads label configuration from viper (extended format only)
 func (c *FileLabelStore) loadLabels(v *viper.Viper) error {
-	// Unmarshal as raw data
+	// Use AllSettings() to preserve case sensitivity of keys from YAML
+	// Viper's Unmarshal() lowercases keys by default, which breaks case-sensitive
+	// username/group matching. AllSettings() preserves the original case.
+	allSettings := v.AllSettings()
+	
 	rawData := make(map[string]RawLabelData)
-	if err := v.Unmarshal(&rawData); err != nil {
-		return err
+	for key, value := range allSettings {
+		if data, ok := value.(map[string]interface{}); ok {
+			rawData[key] = data
+		}
 	}
 
 	// Validate format at startup - detect simple format early
