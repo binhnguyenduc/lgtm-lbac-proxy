@@ -17,4 +17,4 @@ spec:
       name: {{ include "lgtm-lbac-proxy.name" . }}-metrics
   selector:
     {{- include "lgtm-lbac-proxy.selectorLabels" . | nindent 4 }}
-  type: ClusterIP
+  type: {{ .Values.service.type }}
