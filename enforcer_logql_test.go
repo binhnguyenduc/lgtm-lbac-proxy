@@ -204,12 +204,12 @@ func TestLogQLEnforcer_Enforce(t *testing.T) {
 
 func TestEnforceMultiLabelMatchers(t *testing.T) {
 	tests := []struct {
-		name           string
-		matchers       []*labels.Matcher
-		policy         LabelPolicy
-		expectedCount  int
-		expectErr      bool
-		errorContains  string
+		name          string
+		matchers      []*labels.Matcher
+		policy        LabelPolicy
+		expectedCount int
+		expectErr     bool
+		errorContains string
 	}{
 		{
 			name:     "No existing matchers - inject all rules",
@@ -286,3 +286,89 @@ func TestEnforceMultiLabelMatchers(t *testing.T) {
 	}
 }
 
+// TestLogQLEnforcer_EmptyQuery_ConsolidatedPolicy tests LogQL enforcer with consolidated multi-group policies
+func TestLogQLEnforcer_EmptyQuery_ConsolidatedPolicy(t *testing.T) {
+	tests := []struct {
+		name           string
+		query          string
+		policy         LabelPolicy
+		expectedResult string
+		expectErr      bool
+	}{
+		{
+			name:  "Empty query with consolidated environment values",
+			query: "",
+			policy: LabelPolicy{
+				Rules: []LabelRule{
+					{Name: "environment", Operator: "=~", Values: []string{"production", "uat"}},
+				},
+				Logic: "OR",
+			},
+			expectedResult: `{environment=~"production|uat"}`,
+			expectErr:      false,
+		},
+		{
+			name:  "Empty query with consolidated multi-label policy",
+			query: "",
+			policy: LabelPolicy{
+				Rules: []LabelRule{
+					{Name: "cluster", Operator: "=~", Values: []string{"prod-argocd", "prod-backoffice", "uat-allinone", "uat-l1-k8s"}},
+					{Name: "environment", Operator: "=~", Values: []string{"production", "uat"}},
+				},
+				Logic: "OR",
+			},
+			expectedResult: `{cluster=~"prod-argocd|prod-backoffice|uat-allinone|uat-l1-k8s", environment=~"production|uat"}`,
+			expectErr:      false,
+		},
+		{
+			name:  "Simple query with consolidated policy injection",
+			query: `{job="app"}`,
+			policy: LabelPolicy{
+				Rules: []LabelRule{
+					{Name: "environment", Operator: "=~", Values: []string{"production", "uat"}},
+				},
+				Logic: "OR",
+			},
+			expectedResult: `{job="app", environment=~"production|uat"}`,
+			expectErr:      false,
+		},
+		{
+			name:  "Query with authorized value in consolidated policy",
+			query: `{job="app", environment="production"}`,
+			policy: LabelPolicy{
+				Rules: []LabelRule{
+					{Name: "environment", Operator: "=~", Values: []string{"production", "uat"}},
+				},
+				Logic: "OR",
+			},
+			expectedResult: `{job="app", environment="production"}`,
+			expectErr:      false,
+		},
+		{
+			name:  "Query with another authorized value in consolidated policy",
+			query: `{job="app", environment="uat"}`,
+			policy: LabelPolicy{
+				Rules: []LabelRule{
+					{Name: "environment", Operator: "=~", Values: []string{"production", "uat"}},
+				},
+				Logic: "OR",
+			},
+			expectedResult: `{job="app", environment="uat"}`,
+			expectErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			enforcer := LogQLEnforcer{}
+			result, err := enforcer.Enforce(tt.query, tt.policy)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedResult, result)
+			}
+		})
+	}
+}

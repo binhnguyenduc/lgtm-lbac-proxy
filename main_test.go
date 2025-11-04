@@ -678,28 +678,42 @@ func TestGetLabelPolicyMerge(t *testing.T) {
 		t.Errorf("Expected Logic=OR, got %s", policy.Logic)
 	}
 
-	// Verify we have 2 rules
-	if len(policy.Rules) != 2 {
-		t.Errorf("Expected 2 rules, got %d", len(policy.Rules))
+	// Verify we have 1 consolidated rule (duplicate label names are merged)
+	if len(policy.Rules) != 1 {
+		t.Errorf("Expected 1 consolidated rule, got %d", len(policy.Rules))
+	}
+
+	// Verify the consolidated rule has correct properties
+	if policy.Rules[0].Name != "tenant_id" {
+		t.Errorf("Expected rule name 'tenant_id', got '%s'", policy.Rules[0].Name)
+	}
+
+	// Operator should be upgraded to regex match for multiple values
+	if policy.Rules[0].Operator != OperatorRegexMatch {
+		t.Errorf("Expected operator '=~' (consolidated regex), got '%s'", policy.Rules[0].Operator)
 	}
 
 	// Build allowed values map
 	allowedValues := make(map[string]bool)
-	for _, rule := range policy.Rules {
-		if rule.Name == "tenant_id" {
-			for _, v := range rule.Values {
-				allowedValues[v] = true
-			}
-		}
+	for _, v := range policy.Rules[0].Values {
+		allowedValues[v] = true
 	}
 
 	t.Logf("Allowed values: %v", allowedValues)
 
-	// Verify all 4 values are allowed
+	// Verify all 4 values are allowed in the consolidated rule
 	expectedValues := []string{"allowed_group1", "also_allowed_group1", "allowed_group2", "also_allowed_group2"}
 	for _, v := range expectedValues {
 		if !allowedValues[v] {
 			t.Errorf("Expected %s to be allowed", v)
+		}
+	}
+
+	// Verify values are sorted (deterministic output)
+	sortedExpected := []string{"allowed_group1", "allowed_group2", "also_allowed_group1", "also_allowed_group2"}
+	for i, expected := range sortedExpected {
+		if policy.Rules[0].Values[i] != expected {
+			t.Errorf("Expected value[%d]='%s', got '%s'", i, expected, policy.Rules[0].Values[i])
 		}
 	}
 }

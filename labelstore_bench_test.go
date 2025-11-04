@@ -284,3 +284,74 @@ group2:
 		_, _ = store.GetLabelPolicy(identity, "namespace")
 	}
 }
+
+// BenchmarkConsolidateDuplicateLabels_SingleDuplicate benchmarks consolidation
+// with minimal duplication (2 rules with same label)
+func BenchmarkConsolidateDuplicateLabels_SingleDuplicate(b *testing.B) {
+	store := &FileLabelStore{}
+
+	rules := []LabelRule{
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"production"}},
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"uat"}},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = store.consolidateDuplicateLabels(rules)
+	}
+}
+
+// BenchmarkConsolidateDuplicateLabels_MultipleDuplicates benchmarks consolidation
+// with multiple duplicate labels (realistic multi-group scenario)
+func BenchmarkConsolidateDuplicateLabels_MultipleDuplicates(b *testing.B) {
+	store := &FileLabelStore{}
+
+	rules := []LabelRule{
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"production"}},
+		{Name: "cluster", Operator: OperatorEquals, Values: []string{"prod-argocd", "prod-backoffice"}},
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"uat"}},
+		{Name: "cluster", Operator: OperatorEquals, Values: []string{"uat-allinone", "uat-l1-k8s"}},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = store.consolidateDuplicateLabels(rules)
+	}
+}
+
+// BenchmarkConsolidateDuplicateLabels_NoDuplication benchmarks consolidation
+// with no duplicate labels (baseline performance)
+func BenchmarkConsolidateDuplicateLabels_NoDuplication(b *testing.B) {
+	store := &FileLabelStore{}
+
+	rules := []LabelRule{
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"prod"}},
+		{Name: "cluster", Operator: OperatorEquals, Values: []string{"prod-k8s"}},
+		{Name: "team", Operator: OperatorEquals, Values: []string{"backend"}},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = store.consolidateDuplicateLabels(rules)
+	}
+}
+
+// BenchmarkConsolidateDuplicateLabels_ThreeGroups benchmarks consolidation
+// across three groups (complex scenario)
+func BenchmarkConsolidateDuplicateLabels_ThreeGroups(b *testing.B) {
+	store := &FileLabelStore{}
+
+	rules := []LabelRule{
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"production"}},
+		{Name: "cluster", Operator: OperatorEquals, Values: []string{"prod-argocd"}},
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"uat"}},
+		{Name: "cluster", Operator: OperatorEquals, Values: []string{"uat-allinone"}},
+		{Name: "environment", Operator: OperatorEquals, Values: []string{"dev"}},
+		{Name: "cluster", Operator: OperatorEquals, Values: []string{"dev-k8s"}},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = store.consolidateDuplicateLabels(rules)
+	}
+}

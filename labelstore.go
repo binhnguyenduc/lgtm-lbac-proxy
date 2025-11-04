@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -262,6 +263,8 @@ func (c *FileLabelStore) GetLabelPolicy(identity UserIdentity, defaultLabel stri
 
 // mergePolicies combines multiple policies into a single policy.
 // Rules are merged with OR logic by default (user can access if any policy allows).
+// When merging policies from multiple groups, duplicate label names are consolidated
+// by combining their values using regex OR operators (e.g., environment=~"prod|uat").
 func (c *FileLabelStore) mergePolicies(policies []*LabelPolicy) *LabelPolicy {
 	if len(policies) == 0 {
 		return &LabelPolicy{Rules: []LabelRule{}, Logic: LogicAND}
@@ -287,8 +290,12 @@ func (c *FileLabelStore) mergePolicies(policies []*LabelPolicy) *LabelPolicy {
 		merged.Rules = append(merged.Rules, policy.Rules...)
 	}
 
-	// Deduplicate rules
+	// Deduplicate exact duplicate rules (same name, operator, values)
 	merged.Rules = c.deduplicateRules(merged.Rules)
+
+	// Consolidate rules with duplicate label names by merging their values
+	// This fixes invalid query generation for multi-group users
+	merged.Rules = c.consolidateDuplicateLabels(merged.Rules)
 
 	return merged
 }
@@ -308,4 +315,149 @@ func (c *FileLabelStore) deduplicateRules(rules []LabelRule) []LabelRule {
 	}
 
 	return result
+}
+
+// consolidateDuplicateLabels deduplicates rules with the same label name by consolidating
+// their values using regex OR operators. This fixes invalid query generation when users
+// belong to multiple groups with conflicting label rules.
+//
+// Algorithm:
+//  1. Group rules by label name
+//  2. For each group with duplicates, merge values into a single rule
+//  3. Upgrade operators to regex when needed (= → =~, != → !~)
+//  4. Sort and deduplicate values for deterministic output
+//
+// Example:
+//
+//	Input:  [{name: "environment", op: "=", values: ["prod"]},
+//	         {name: "environment", op: "=", values: ["uat"]}]
+//	Output: [{name: "environment", op: "=~", values: ["prod", "uat"]}]
+func (c *FileLabelStore) consolidateDuplicateLabels(rules []LabelRule) []LabelRule {
+	if len(rules) <= 1 {
+		return rules
+	}
+
+	// Group rules by label name
+	labelGroups := make(map[string][]LabelRule)
+	for _, rule := range rules {
+		labelGroups[rule.Name] = append(labelGroups[rule.Name], rule)
+	}
+
+	// Consolidate each group
+	var result []LabelRule
+	for labelName, group := range labelGroups {
+		if len(group) == 1 {
+			// No duplication, keep original rule
+			result = append(result, group[0])
+		} else {
+			// Multiple rules for same label - consolidate values
+			consolidated := c.mergeRuleGroup(labelName, group)
+			if consolidated != nil {
+				result = append(result, *consolidated)
+
+				// Log consolidation for debugging
+				log.Debug().
+					Str("label", labelName).
+					Int("original_rules", len(group)).
+					Int("consolidated_values", len(consolidated.Values)).
+					Str("operator", consolidated.Operator).
+					Msg("Consolidated duplicate label rules")
+			}
+		}
+	}
+
+	// Sort result by label name for deterministic output
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+
+	return result
+}
+
+// mergeRuleGroup consolidates multiple rules with the same label name into a single rule.
+// It collects all unique values, detects operator conflicts, and chooses an appropriate
+// final operator for OR logic.
+//
+// Operator Resolution:
+//   - Positive matches (=, =~) take priority over negative matches (!=, !~)
+//   - If any rule uses regex (=~, !~), the result uses regex
+//   - Conflicts between positive and negative operators log a warning
+//
+// Returns nil if the group is empty.
+func (c *FileLabelStore) mergeRuleGroup(labelName string, group []LabelRule) *LabelRule {
+	if len(group) == 0 {
+		return nil
+	}
+
+	if len(group) == 1 {
+		return &group[0]
+	}
+
+	// Collect all unique values
+	valueSet := make(map[string]bool)
+	var allValues []string
+
+	// Track operator types
+	hasPositiveMatch := false // = or =~
+	hasNegativeMatch := false // != or !~
+	hasRegexOperator := false // =~ or !~
+
+	for _, rule := range group {
+		// Track operator types
+		switch rule.Operator {
+		case OperatorEquals, OperatorRegexMatch:
+			hasPositiveMatch = true
+			if rule.Operator == OperatorRegexMatch {
+				hasRegexOperator = true
+			}
+		case OperatorNotEquals, OperatorRegexNoMatch:
+			hasNegativeMatch = true
+			if rule.Operator == OperatorRegexNoMatch {
+				hasRegexOperator = true
+			}
+		}
+
+		// Collect values
+		for _, value := range rule.Values {
+			if !valueSet[value] {
+				valueSet[value] = true
+				allValues = append(allValues, value)
+			}
+		}
+	}
+
+	// Detect operator conflicts
+	if hasPositiveMatch && hasNegativeMatch {
+		log.Warn().
+			Str("label", labelName).
+			Msg("Conflicting operators detected (positive + negative) - using positive match for OR logic")
+	}
+
+	// Choose final operator based on OR logic (permissive)
+	// Priority: positive match > negative match, regex > exact
+	var finalOperator string
+	if hasPositiveMatch {
+		// Positive match wins in OR logic
+		if hasRegexOperator || len(allValues) > 1 {
+			finalOperator = OperatorRegexMatch // Use =~ for multiple values or existing regex
+		} else {
+			finalOperator = OperatorEquals // Single value, exact match
+		}
+	} else {
+		// Only negative matches
+		if hasRegexOperator || len(allValues) > 1 {
+			finalOperator = OperatorRegexNoMatch // Use !~ for multiple values or existing regex
+		} else {
+			finalOperator = OperatorNotEquals // Single value, exact not-equal
+		}
+	}
+
+	// Sort values for deterministic output
+	sort.Strings(allValues)
+
+	return &LabelRule{
+		Name:     labelName,
+		Operator: finalOperator,
+		Values:   allValues,
+	}
 }
