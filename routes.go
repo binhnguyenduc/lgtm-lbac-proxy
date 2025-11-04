@@ -119,6 +119,9 @@ func (a *App) WithTempo() *App {
 		return a
 	}
 	routes := []Route{
+		// Query Echo - https://grafana.com/docs/tempo/latest/api_docs/#query-echo-endpoint
+		// Note: Health check endpoint, no query parameters
+		{Url: "/api/echo", MatchWord: ""},
 		// Search Endpoints - https://grafana.com/docs/tempo/latest/api_docs/#search
 		{Url: "/api/search", MatchWord: "q"},
 		{Url: "/api/v2/search", MatchWord: "q"},

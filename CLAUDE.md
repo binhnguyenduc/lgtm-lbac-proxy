@@ -302,6 +302,6 @@ Output: { resource.namespace="prod" && resource.team="backend" && span.http.stat
 |---------|-----------|
 | **Loki** | `/loki/api/v1/query`, `/loki/api/v1/query_range` |
 | **Thanos/Prometheus** | `/api/v1/query`, `/api/v1/query_range` |
-| **Tempo** | `/tempo/api/search`, `/tempo/api/v2/search`, `/tempo/api/traces/{traceID}` |
+| **Tempo** | `/api/echo`, `/tempo/api/search`, `/tempo/api/v2/search`, `/tempo/api/traces/{traceID}` |
 
 All routes: `auth → validate labels → enforce query → proxy to upstream`
