@@ -5,6 +5,17 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.5] - 2025-11-04
+
+### Changed
+
+- **Service Type Configuration**: Service type is now configurable via `service.type` in `values.yaml`
+  - Enables deployment as LoadBalancer, NodePort, or other Kubernetes service types
+  - Previously hardcoded to ClusterIP only
+  - Default remains ClusterIP for backward compatibility
+
+- **AppVersion**: Updated to 0.15.6 to match proxy release with Helm chart enhancements
+
 ## [1.12.4] - 2025-11-04
 
 ### Added
