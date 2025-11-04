@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.6] - 2025-11-04
+
+### Changed
+
+- **Helm Chart Service Type Configuration**:
+  - Service type is now configurable via `service.type` in `values.yaml`
+  - Enables deployment as LoadBalancer, NodePort, or other Kubernetes service types
+  - Previously hardcoded to ClusterIP only
+  - Default remains ClusterIP for backward compatibility
+
 ## [0.15.5] - 2025-11-03
 
 ### Changed
