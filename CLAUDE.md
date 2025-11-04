@@ -300,8 +300,8 @@ Output: { resource.namespace="prod" && resource.team="backend" && span.http.stat
 
 | Service | Endpoints |
 |---------|-----------|
-| **Loki** | `/loki/api/v1/query`, `/loki/api/v1/query_range` |
-| **Thanos/Prometheus** | `/api/v1/query`, `/api/v1/query_range` |
-| **Tempo** | `/api/echo`, `/tempo/api/search`, `/tempo/api/v2/search`, `/tempo/api/traces/{traceID}` |
+| **Loki** | `/loki/api/v1/query`, `/loki/api/v1/query_range`, `/loki/api/v1/labels`, etc. |
+| **Thanos/Prometheus** | `/api/v1/query`, `/api/v1/query_range`, `/api/v1/series`, etc. |
+| **Tempo** | `/api/echo`, `/api/search`, `/api/v2/search`, `/api/traces/{traceID}`, `/api/metrics/*` |
 
 All routes: `auth → validate labels → enforce query → proxy to upstream`

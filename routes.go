@@ -113,6 +113,11 @@ func (a *App) WithLoki() *App {
 //
 // Routes are based on Tempo HTTP API:
 // https://grafana.com/docs/tempo/latest/api_docs/
+//
+// Note: Tempo routes use empty prefix to match official Tempo API paths (/api/search, /api/v2/*, etc.)
+// There are no conflicts with Thanos routes because:
+// - Thanos uses /api/v1/* exclusively
+// - Tempo uses /api/search, /api/v2/*, /api/metrics/*, /api/echo, /api/traces/*
 func (a *App) WithTempo() *App {
 	if a.Cfg.Tempo.URL == "" {
 		log.Warn().Msg("Tempo URL not set, skipping Tempo routes")
@@ -139,7 +144,7 @@ func (a *App) WithTempo() *App {
 		{Url: "/api/traces/{traceID}", MatchWord: ""},
 		{Url: "/api/v2/traces/{traceID}", MatchWord: ""},
 	}
-	tempoRouter := a.e.PathPrefix("/tempo").Subrouter()
+	tempoRouter := a.e.PathPrefix("").Subrouter()
 	proxyCfg := a.Cfg.GetProxyConfig(a.Cfg.Tempo.Proxy)
 	for _, route := range routes {
 		log.Trace().Any("route", route).Msg("Tempo route")

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.7] - 2025-11-04
+
+### Fixed
+
+- **Tempo API Endpoint Routing**:
+  - Fixed incorrect `/tempo` path prefix for Tempo routes to match official Tempo HTTP API specification
+  - Changed from `/tempo/api/search` to `/api/search` (and all other Tempo endpoints)
+  - Tempo API serves at `/api/*` paths, not `/tempo/api/*`
+  - Verified no routing conflicts: Thanos uses `/api/v1/*`, Tempo uses `/api/echo`, `/api/search*`, `/api/v2/*`, `/api/metrics/*`, `/api/traces/*`
+  - **Impact**: Tempo queries will now correctly route to upstream server instead of failing with 404
+
+### Changed
+
+- **Documentation**:
+  - Updated CLAUDE.md API Routes table to reflect correct Tempo endpoint paths
+  - Added routing conflict analysis documentation in `routes.go`
+
 ## [0.15.5] - 2025-11-03
 
 ### Changed
