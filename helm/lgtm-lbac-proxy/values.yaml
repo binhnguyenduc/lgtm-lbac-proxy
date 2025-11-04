@@ -17,6 +17,7 @@ proxyConfig:
   forceHTTP2: true             # Enable HTTP/2 when available (default: true)
 
 thanos:
+  enabled: true  # Set to false to disable Thanos proxy
   url: https://thanos-querier.monitoring.svc.cluster.local:9091
   # Per-upstream proxy configuration (optional - overrides global defaults)
   # Uncomment to customize Thanos-specific timeouts and connection pooling
@@ -25,6 +26,7 @@ thanos:
   #   maxIdleConnsPerHost: 100     # Override: Connection pool size for Thanos
 
 loki:
+  enabled: true  # Set to false to disable Loki proxy
   url: https://loki-query-frontend-http.logging.svc.cluster.local:3100
   actorHeader: X-Loki-Actor-Path
   headers:
@@ -36,6 +38,7 @@ loki:
   #   maxIdleConnsPerHost: 150     # Override: High log volume needs more connections
 
 tempo:
+  enabled: true  # Set to false to disable Tempo proxy
   url: https://tempo-query-frontend.tracing.svc.cluster.local:3200
   actorHeader: ""
   headers: {}

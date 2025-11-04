@@ -5,6 +5,40 @@ All notable changes to the LGTM LBAC Proxy Helm chart will be documented in this
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.4] - 2025-11-04
+
+### Added
+
+- **Service Enable/Disable Parameters**: New `enabled` flags for Thanos, Loki, and Tempo services
+  - `thanos.enabled: true/false` - Control Thanos proxy (default: true)
+  - `loki.enabled: true/false` - Control Loki proxy (default: true)
+  - `tempo.enabled: true/false` - Control Tempo proxy (default: true)
+  - When disabled, URLs are set to empty string to prevent routing to that service
+
+### Changed
+
+- **ConfigMap Template**: Updated to conditionally render service URLs based on `enabled` flag
+  - Thanos URL: `{{ if .Values.thanos.enabled }}{{ .Values.thanos.url }}{{ else }}""{{ end }}`
+  - Loki URL: `{{ if .Values.loki.enabled }}{{ .Values.loki.url }}{{ else }}""{{ end }}`
+  - Tempo URL: `{{ if .Values.tempo.enabled }}{{ .Values.tempo.url }}{{ else }}""{{ end }}`
+
+### Usage
+
+Disable individual services:
+```bash
+helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  --set thanos.enabled=false \
+  --set loki.enabled=false
+```
+
+Or disable all services except one:
+```bash
+helm install lgtm-lbac-proxy ./helm/lgtm-lbac-proxy \
+  --set thanos.enabled=true \
+  --set loki.enabled=false \
+  --set tempo.enabled=false
+```
+
 ## [1.12.3] - 2025-11-03
 
 ### Changed

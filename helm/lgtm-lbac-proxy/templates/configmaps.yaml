@@ -45,7 +45,7 @@ data:
       alert_cert: {{ .Values.alert.cert | quote }}
 
     thanos:
-      url: {{ .Values.thanos.url }}
+      url: {{ if .Values.thanos.enabled }}{{ .Values.thanos.url }}{{ else }}""{{ end }}
       use_mutual_tls: {{ .Values.tls.thanos.enabled }}
       cert: "/etc/secrets/ca/thanos/{{ .Values.tls.thanos.cert }}"
       key: "/etc/secrets/ca/thanos/{{ .Values.tls.thanos.key }}"
@@ -56,7 +56,7 @@ data:
         {{- end }}
 
     loki:
-      url: {{ .Values.loki.url }}
+      url: {{ if .Values.loki.enabled }}{{ .Values.loki.url }}{{ else }}""{{ end }}
       use_mutual_tls: {{ .Values.tls.loki.enabled }}
       cert: "/etc/secrets/ca/loki/{{ .Values.tls.loki.cert }}"
       key: "/etc/secrets/ca/loki/{{ .Values.tls.loki.key }}"
@@ -67,7 +67,7 @@ data:
         {{- end }}
 
     tempo:
-      url: {{ .Values.tempo.url }}
+      url: {{ if .Values.tempo.enabled }}{{ .Values.tempo.url }}{{ else }}""{{ end }}
       use_mutual_tls: {{ .Values.tls.tempo.enabled }}
       cert: "/etc/secrets/ca/tempo/{{ .Values.tls.tempo.cert }}"
       key: "/etc/secrets/ca/tempo/{{ .Values.tls.tempo.key }}"
