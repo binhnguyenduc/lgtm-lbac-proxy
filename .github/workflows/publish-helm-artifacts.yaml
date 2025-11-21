@@ -37,7 +37,7 @@ jobs:
       ARTIFACT_REPO: ${{ inputs.artifact_repo || 'binhnguyenduc/helm-charts' }}
     steps:
       - name: Checkout chart source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -129,7 +129,7 @@ jobs:
           echo "chart_version=$CHART_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Checkout artifact repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ env.ARTIFACT_REPO }}
           token: ${{ secrets.HELM_REPO_PUSH_TOKEN }}
